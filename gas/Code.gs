@@ -199,6 +199,17 @@ function getSnapshot_(refresh) {
       return data;
     }
   }
+  // 画面からの要求では取り直さず、15分ごとの自動処理が保存した「最後の正常データ」をすぐ返す（取り直しは約20〜30秒かかり、
+  // 同時に届くと Google 側が一時的に404を返すことがあるため）。保存データが無いとき・手動の「最新に更新」だけ取り直す
+  if (!refresh) {
+    const last = persistGet_('S');
+    if (last) {
+      cachePut_(cache, 'snapshot', last, 300);
+      const data = JSON.parse(last);
+      data.patrolIndex = readPatrolIndex_();
+      return data;
+    }
+  }
   let data;
   try {
     data = refreshSnapshot_();

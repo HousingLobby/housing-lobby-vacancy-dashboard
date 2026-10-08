@@ -55,7 +55,7 @@
   if (data.error) notices.push(`サーバーに接続できないため、${dateTime(data.asOf)}時点のデータで表示しています（${data.error}）。巡回登録は送信待ちとして保存され、つながると自動で送られます。`);
   else if (data.stale) notices.push(`Asanaに一時的に接続できないため、${dateTime(data.asOf)}時点のデータで表示しています。復旧すると自動で最新になります。`);
   else if (!data.live) notices.push(`${dateTime(data.asOf)}時点の固定データです。`);
-  else notices.push('Asanaの最新データを表示しています（最大10分前）。巡回記録はAsanaの物件タスクの「巡回確認（日付）」サブタスクに蓄積されます。');
+  else notices.push('Asanaのデータを表示しています（15分ごとに自動更新）。巡回記録はAsanaの物件タスクの「巡回確認（日付）」サブタスクに蓄積されます。');
   if (!managementCurrent) notices.push('管理戸数が未登録のため、入居率・評価入居率は表示しません。');
   else if (rateMonth !== currentMonth) notices.push(`入居率の分母は最新の会議資料（${monthLabel(rateMonth)}実績）の管理戸数です。`);
   el('data-notice').textContent = notices.join(' ');
