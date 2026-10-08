@@ -13,17 +13,23 @@
   const request = async (params, body, timeoutMs = 90000, {interactive = true} = {}) => {
     const payload = {...(params || {}), ...(body || {})};
     if (window.Auth) payload.token = await window.Auth.token({interactive});
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    let res;
-    try {
-      res = await fetch(apiUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(payload), signal: ctrl.signal});
-    } catch (err) {
-      throw fail(err.name === 'AbortError' ? '応答がありません（時間切れ）' : '通信できません（電波・ネット接続を確認してください）', true);
-    } finally { clearTimeout(timer); }
-    if (!res.ok) throw fail(`通信エラー（${res.status}）`, res.status >= 500 || res.status === 429);
-    let data;
-    try { data = await res.json(); } catch { throw fail('サーバーの応答を読み取れません', true); }
+    // GASは起動直後や同時アクセスで一時的に404・5xx・HTMLを返すことがあるので、間隔をあけて2回までやり直す
+    let res, data;
+    for (let attempt = 0; ; attempt++) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      let transient = null;
+      try {
+        res = await fetch(apiUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(payload), signal: ctrl.signal});
+        if (!res.ok) transient = fail(`通信エラー（${res.status}）`, res.status >= 500 || res.status === 429 || res.status === 404);
+        else { try { data = await res.json(); } catch { transient = fail('サーバーの応答を読み取れません', true); } }
+      } catch (err) {
+        transient = fail(err.name === 'AbortError' ? '応答がありません（時間切れ）' : '通信できません（電波・ネット接続を確認してください）', true);
+      } finally { clearTimeout(timer); }
+      if (!transient) break;
+      if (!transient.retryable || attempt >= 2 || transient.message.includes('時間切れ')) throw transient;
+      await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+    }
     if (data.auth && window.Auth) {
       if (interactive) { await window.Auth.login(); return new Promise(() => {}); }
       throw fail(data.error, true); // 送信待ちは、ログインし直したあとに再送する
