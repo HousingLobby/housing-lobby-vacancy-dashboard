@@ -938,6 +938,31 @@ function notifyAdmin_(subject, body, throttleKey) {
   try { MailApp.sendEmail(to, subject, body + '\n\n（空室業務ダッシュボード GAS から自動送信）'); } catch (e) { Logger.log('通知を送れませんでした：' + e.message); }
 }
 
+/* ---------- GASの引っ越し（所有アカウントの変更） ---------- */
+
+/** 【旧GASで実行】新GASへ移す設定を1つの文字列にしてログに出す。トークン等を含むので、ログを人に見せない・スクショしない */
+function exportSettingsForMigration() {
+  const all = PropertiesService.getScriptProperties().getProperties();
+  const out = {};
+  Object.keys(all).forEach(k => { if (!/^(X_|STATUS_|ALERTED_|PATROL_FIELDS$)/.test(k)) out[k] = all[k]; });
+  Logger.log('移す設定：' + Object.keys(out).length + '件（' + Object.keys(out).filter(k => !/^[LM]_/.test(k)).join(', ') + ' ほか）');
+  Logger.log(Utilities.base64Encode(JSON.stringify(out), Utilities.Charset.UTF_8));
+}
+
+/** 【新GASで実行】ファイル「Migration」に貼った MIGRATION_SETTINGS から設定を復元する。終わったら Migration ファイルは削除する */
+function importSettingsFromMigration() {
+  if (typeof MIGRATION_SETTINGS === 'undefined' || !MIGRATION_SETTINGS) throw new Error('ファイル「Migration」に MIGRATION_SETTINGS を貼ってください');
+  const obj = JSON.parse(Utilities.newBlob(Utilities.base64Decode(MIGRATION_SETTINGS)).getDataAsString('UTF-8'));
+  PropertiesService.getScriptProperties().setProperties(obj, false);
+  Logger.log(Object.keys(obj).length + '件の設定を移しました。次に installTriggers を実行してください');
+}
+
+/** 【旧GASで実行】新GASへ切り替えたあと、旧GASの自動処理（15分ごと・毎日）を止める */
+function uninstallTriggers() {
+  ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
+  Logger.log('自動処理をすべて止めました');
+}
+
 /* ---------- Asana API ---------- */
 
 function asanaToken_() {
