@@ -35,10 +35,10 @@
   })();
 
   // GASを呼ぶたびに新しいトークンを取る。interactive=false（送信待ちの自動再送など）では画面遷移しない
-  const token = async ({interactive = true} = {}) => {
+  const token = async ({interactive = true, force = false} = {}) => {
     await ready;
     try {
-      return (await client.acquireTokenSilent({...request, account})).accessToken;
+      return (await client.acquireTokenSilent({...request, account, forceRefresh: force})).accessToken;
     } catch (err) {
       const code = String(err?.errorCode || err?.message || '');
       if (/network|post_request_failed|no_network|timed_out/i.test(code)) throw fail('通信できません（電波・ネット接続を確認してください）', true);

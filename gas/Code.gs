@@ -95,7 +95,9 @@ function verifyUser_(token) {
   } catch (e) { const err = new Error('本人確認に失敗しました（通信エラー）'); err.retryable = true; throw err; }
   const code = res.getResponseCode();
   if (code >= 500 || code === 429) { const err = new Error('本人確認に失敗しました（Microsoft ' + code + '）'); err.retryable = true; throw err; }
-  if (code !== 200) { cache.put(key, 'NG', 300); return null; }
+  // 401＝トークンが無効（短時間だけ覚える）。それ以外の失敗は一時的とみなし、覚えずにやり直してもらう
+  if (code === 401) { cache.put(key, 'NG', 60); return null; }
+  if (code !== 200) { const err = new Error('本人確認が一時的に失敗しました（Microsoft ' + code + '）'); err.retryable = true; throw err; }
   const me = JSON.parse(res.getContentText());
   const upn = String(me.userPrincipalName || '').toLowerCase();
   const domains = String(PropertiesService.getScriptProperties().getProperty('ALLOWED_DOMAINS') || 'hmao034998.onmicrosoft.com,h-lobby.jp')

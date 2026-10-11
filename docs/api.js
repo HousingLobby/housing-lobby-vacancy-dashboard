@@ -10,9 +10,9 @@
   // エラーには retryable を付ける（true＝通信・Asanaの一時的な問題で、あとで自動再送してよい）
   const fail = (message, retryable) => { const e = new Error(message); e.retryable = retryable; return e; };
   // すべてPOST。社内ログインのトークンは本文に入れる（ヘッダーに付けるとGASがCORSの事前確認に応えられない。URLにも載せない）
-  const request = async (params, body, timeoutMs = 90000, {interactive = true} = {}) => {
+  const request = async (params, body, timeoutMs = 90000, {interactive = true, retriedAuth = false} = {}) => {
     const payload = {...(params || {}), ...(body || {})};
-    if (window.Auth) payload.token = await window.Auth.token({interactive});
+    if (window.Auth) payload.token = await window.Auth.token({interactive, force: retriedAuth});
     // GASは起動直後や同時アクセスで一時的に404・5xx・HTMLを返すことがあるので、間隔をあけて2回までやり直す
     let res, data;
     for (let attempt = 0; ; attempt++) {
@@ -31,6 +31,8 @@
       await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
     }
     if (data.auth && window.Auth) {
+      // まずトークンを取り直して1回だけ再送。それでも駄目なときだけログイン画面へ
+      if (!retriedAuth) return request(params, body, timeoutMs, {interactive, retriedAuth: true});
       if (interactive) { await window.Auth.login(); return new Promise(() => {}); }
       throw fail(data.error, true); // 送信待ちは、ログインし直したあとに再送する
     }
