@@ -69,94 +69,98 @@
     return t;
   };
 
+  // オーナー様への「ご相談」候補（マイルドな表現。賃料は1案まで、全体で3案まで）
+  const consultations = (d, own, ref) => {
+    const out = [];
+    if (own && ref && own - ref.median >= 0.2) out.push(['募集賃料のご相談', `近隣の成約状況をふまえ、募集賃料の見直しについてご相談させてください（例：${man(Math.round(ref.median * 10) / 10)}前後）。`, '―']);
+    if (d.viewed >= 3 && d.applied === 0) out.push(['お部屋の印象づくり', '家具や小物を置いて暮らしをイメージしやすくする演出（ステージング）や、照明・香りの工夫をご提案します。', '【要確認】']);
+    if (d.vacantDays != null && d.vacantDays >= 60) out.push(['入居条件のご相談', 'フリーレント（一定期間の家賃無料）や礼金の調整など、お部屋探しの方が選びやすい条件のご相談です。', '【要確認】']);
+    if (out.length < 3 && (d.total === 0 || d.total / (d.months || 1) < 2)) out.push(['募集広告の強化', '写真の撮り直しや、ポータルサイトでの掲載の強化をご提案します。', '【要確認】']);
+    if (out.length < 3) out.push(['仲介会社へのご紹介強化', '仲介会社へのご紹介を強化するため、広告料（AD）の設定をご相談させてください。', '【要確認】']);
+    return out.slice(0, 3);
+  };
+
   async function build(d, extra = {}) {
     const own = rentNum(d.rent);
     const m = d.market && !d.market.error && d.market.count ? d.market : null;
     const ref = m ? (m.same && m.same.count >= 3 ? m.same : m.all) : null;
     const today = (d.to || new Date().toISOString().slice(0, 10)).slice(0, 10);
-    const loss = own && d.vacantDays ? own * d.vacantDays / 30 : null;
     const body = [];
 
+    // オーナー様向け（マイルド版）：事実のご報告7割・ご相談3割。機会損失の金額・割合・評価語（不利・見送り等）は載せない（社内用レポートにだけ載せる）
+    const n = (() => { let k = 0; return () => ++k; })();
     // 表紙・あいさつ
     body.push(para([memo('オーナー様のお名前'), run('　様')], {after: 120}));
     body.push(para(run(`${jpDate(today)}`), {align: 'right', after: 0}));
     body.push(para([run('株式会社ハウジングロビー　担当：'), memo('氏名・連絡先')], {align: 'right', after: 200}));
     body.push(h1(`${d.property || ''} ${d.room || ''}　募集状況のご報告`));
-    body.push(p('平素より大変お世話になっております。標記のお部屋の募集状況と、今後のご提案をご報告いたします。', {after: 160}));
+    body.push(p('平素より大変お世話になっております。標記のお部屋の募集状況について、ご報告いたします。', {after: 160}));
 
-    // 1. 要点
-    body.push(h2('1. ご報告の要点'));
-    if (d.vacantDays != null) body.push(bullet(run(`空室期間：解約日（${jpDate(d.moveOut)}）から${d.vacantDays}日${loss ? `（家賃収入の機会損失の目安：約${man(loss)}）` : ''}`)));
-    body.push(bullet(run(`直近${d.months}か月の反響${d.total}件・内見${d.viewed}件・申込${d.applied}件`)));
-    if (own && ref) { const df = own - ref.median; body.push(bullet(run(`賃料${man(own)}は、近隣の成約中央値（${man(ref.median)}）${Math.abs(df) < 0.2 ? 'とほぼ同水準' : `より${man(Math.abs(df))}${df > 0 ? '高い' : '低い'}`}です`))); }
-    body.push(bullet(memo('オーナー様に一番お伝えしたい結論を1〜2行で（例：賃料を○円下げれば○月中の成約が見込めます）')));
-
-    // 2. 数字
-    body.push(h2('2. 募集の状況'));
-    body.push(p(`集計期間：${jpDate(d.from)}〜${jpDate(d.to)}（直近${d.months}か月）`, {size: 9, color: '5C7182'}));
-    body.push(table(['項目', '件数・割合', '説明'], [
-      ['反響（お問い合わせ・セルフ内見）', `${d.total}件`, `同じ方を1人と数えると${d.people}人`],
-      ['内見', `${d.viewed}件`, `内見率 ${pct(d.viewed, d.total)}`],
-      ['申込', `${d.applied}件`, `反響からの申込率 ${pct(d.applied, d.total)}`],
-      ['仲介会社の同行内見', `${d.brokerVisits || 0}件`, '他社経由のご案内'],
-      ['この号室への反響', `${d.thisRoom || 0}件`, '物件全体のうち、このお部屋を指定したもの']
-    ], [3600, 1800, 4200]));
+    // 1. 募集の状況（件数だけ）
+    body.push(h2(`${n()}. 募集の状況`));
+    body.push(p(`直近${d.months}か月（${jpDate(d.from)}〜${jpDate(d.to)}）の状況です。`, {size: 9, color: '5C7182'}));
+    body.push(table(['項目', '件数'], [
+      ['お問い合わせ・セルフ内見', `${d.total}件`],
+      ['ご内見', `${d.viewed}件`],
+      ['お申込み', `${d.applied}件`],
+      ['仲介会社からのご案内', `${d.brokerVisits || 0}件`]
+    ], [6400, 3200]));
     const src = Object.entries(d.bySource || {}).sort((a, b) => b[1] - a[1]);
-    if (src.length) { body.push(p('反響の経路', {bold: true})); body.push(table(['経路', '件数', '構成比'], src.map(([k, v]) => [k, `${v}件`, pct(v, d.total)]), [4800, 2400, 2400])); }
-    const mon = Object.entries(d.byMonth || {}).sort();
-    if (mon.length) { body.push(p('月別の反響数', {bold: true})); body.push(table(['月', '件数'], mon.map(([k, v]) => [k.replace(/^(\d{4})-(\d{2})$/, (s, y, mo) => `${y}年${Number(mo)}月`), `${v}件`]), [4800, 4800])); }
+    if (src.length) body.push(p(`お問い合わせの経路：${src.map(([k, v]) => `${k} ${v}件`).join('、')}`));
+    if (d.vacantDays != null) body.push(p(`ご退去（${jpDate(d.moveOut)}）から${d.vacantDays}日が経過しています。`));
+    body.push(para(memo('この期間の手応え（例：週末を中心にお問い合わせをいただいています）')));
 
-    // 3. 相場
+    // 2. 近隣の成約相場（事実だけ。「高い・低い」は書かない）
     if (m) {
-      body.push(h2('3. 近隣の成約相場'));
-      body.push(p(`${m.scope === 'city' ? `${m.town}周辺は事例が少ないため${m.city || '市内'}全体` : `${m.town}`}の成約事例（${m.period || ''}）との比較です。`, {size: 9, color: '5C7182'}));
+      body.push(h2(`${n()}. 近隣の成約状況（ご参考）`));
+      body.push(p(`${m.scope === 'city' ? `${m.city || '市内'}` : `${m.town}周辺`}で成約したお部屋の賃料です（${m.period || ''}）。`, {size: 9, color: '5C7182'}));
       const rows = [];
-      if (m.same) rows.push([`同じ間取り（${m.layout || ''}）`, `${m.same.count}件`, man(m.same.median), `${man(m.same.q1)}〜${man(m.same.q3)}`, `${man(m.same.min)}〜${man(m.same.max)}`]);
-      if (m.similar && m.similarLayouts && m.similarLayouts.length) rows.push([`類似間取り（${m.similarLayouts.join('・')}）`, `${m.similar.count}件`, man(m.similar.median), `${man(m.similar.q1)}〜${man(m.similar.q3)}`, `${man(m.similar.min)}〜${man(m.similar.max)}`]);
-      if (!rows.length && m.all) rows.push(['全間取り', `${m.all.count}件`, man(m.all.median), `${man(m.all.q1)}〜${man(m.all.q3)}`, `${man(m.all.min)}〜${man(m.all.max)}`]);
-      body.push(table(['比較対象', '事例数', '成約の中央値', '中央の半数', '最低〜最高'], rows, [2800, 1200, 1800, 1900, 1900]));
-      if (own) body.push(p(`このお部屋の賃料：${man(own)}`, {bold: true}));
+      if (m.same) rows.push([`同じ間取り（${m.layout || ''}）`, `${m.same.count}件`, man(m.same.median), `${man(m.same.q1)}〜${man(m.same.q3)}`]);
+      if (m.similar && m.similarLayouts && m.similarLayouts.length) rows.push([`近い間取り（${m.similarLayouts.join('・')}）`, `${m.similar.count}件`, man(m.similar.median), `${man(m.similar.q1)}〜${man(m.similar.q3)}`]);
+      if (!rows.length && m.all) rows.push(['全間取り', `${m.all.count}件`, man(m.all.median), `${man(m.all.q1)}〜${man(m.all.q3)}`]);
+      body.push(table(['比較対象', '成約件数', '賃料の中央値', '多くの成約の範囲'], rows, [3600, 1600, 2200, 2200]));
+      if (own) body.push(p(`このお部屋の募集賃料：${man(own)}`));
       if ((m.examples || []).length) {
-        body.push(p('賃料が近い成約例', {bold: true}));
-        body.push(table(['物件', '間取り', '賃料', 'この部屋との差', '築年', '成約日'], m.examples.slice(0, 8).map(e => {
-          const df = own ? e.rent - own : null;
-          return [e.name || '（物件名なし）', e.layout || '', man(e.rent), df == null ? '―' : `${df > 0 ? '＋' : df < 0 ? '－' : ''}${man(Math.abs(df))}`, e.age != null ? `築${e.age}年` : '―', e.date || ''];
-        }), [2900, 1000, 1300, 1600, 1100, 1700]));
+        body.push(p('近い条件の成約例', {bold: true}));
+        body.push(table(['物件', '間取り', '賃料', '築年', '成約時期'], m.examples.slice(0, 6).map(e => [e.name || '（物件名非公開）', e.layout || '', man(e.rent), e.age != null ? `築${e.age}年` : '―', e.date || '']), [3400, 1300, 1500, 1500, 1900]));
       }
     }
 
-    // 4. 現地の状況
-    body.push(h2(`${m ? 4 : 3}. 現地の状況`));
+    // 3. 現地の状況（写真があるときだけ写真の欄）
     const pr = extra.patrol;
-    if (pr) {
-      body.push(p(`最新の巡回：${jpDate(pr.date)}（担当：${pr.inspector || '―'}）`));
-      if (pr.issues.length) pr.issues.forEach(i => body.push(bullet(run(`要対応：${i}`))));
-      else body.push(bullet(run('のぼり・看板・室内清掃などの確認項目に不備はありませんでした。')));
-      if (pr.otherIssue) body.push(bullet(run(`その他：${pr.otherIssue}`)));
-    } else body.push(p('巡回の記録はまだありません。'));
     const photos = (extra.photos || []).filter(ph => ph && ph.data);
-    if (photos.length) {
-      body.push(p(`巡回で撮影した写真（${photos.length}枚）`, {bold: true}));
-      body.push(photoGrid(photos.map((ph, i) => ({img: picture(`rIdImg${i + 1}`, i + 1, ph.w, ph.h), caption: `${ph.label || '写真'}（${jpDate(ph.date)}の巡回）`}))));
-      body.push(para(memo('写真の説明（例：玄関ドアの傷は○日に補修予定）。外観・室内の写真の追加もこちらへ')));
-    } // 写真がないときは写真の欄を出さない
+    if (pr || photos.length) {
+      body.push(h2(`${n()}. 現地の状況`));
+      if (pr) {
+        body.push(p(`${jpDate(pr.date)}に現地を巡回し、のぼり・看板・室内の状態を確認しました。`));
+        if (pr.issues.length) body.push(p(`${pr.issues.map(i => i.replace(/（.*）$/, '')).join('・')}について、順次対応いたします。`));
+        else body.push(p('のぼり・看板・室内とも、良好な状態です。'));
+      }
+      if (photos.length) {
+        body.push(photoGrid(photos.map((ph, i) => ({img: picture(`rIdImg${i + 1}`, i + 1, ph.w, ph.h), caption: `${ph.label || '写真'}（${jpDate(ph.date)}）`}))));
+      }
+    }
 
-    // 5. 見立て
-    body.push(h2(`${m ? 5 : 4}. 成約に至っていない理由の見立て`));
-    diagnosis(d, own, ref).forEach(t => body.push(bullet(run(t))));
-    body.push(bullet(memo('仲介会社やお客様の声（例：「駅から遠い」「収納が少ない」）があれば具体的に')));
+    // 4. 当社の取り組み（しっかり動いていることを伝える）
+    body.push(h2(`${n()}. 当社での取り組み`));
+    if (src.length) body.push(bullet(run(`${src.map(([k]) => k).filter(k => !/仲介/.test(k)).slice(0, 3).join('・') || '各種媒体'}などでの募集、セルフ内見（かってに内見）のご案内`)));
+    body.push(bullet(run('仲介会社へのご紹介依頼')));
+    if (pr) body.push(bullet(run(`定期的な現地巡回（次回の予定：${jpDate(addDays(pr.date, 45))}ごろ）`)));
+    body.push(bullet(memo('このほか実施したこと・予定していること（例：写真の撮り直し、仲介会社10社へ資料配布）')));
 
-    // 6. 提案
-    body.push(h2(`${m ? 6 : 5}. ご提案（ご判断をお願いしたいこと）`));
-    body.push(p('次の施策について、ご意向をお聞かせください。費用や条件は担当者が最終確認のうえご案内します。', {size: 9, color: '5C7182'}));
-    body.push(table(['施策', '内容', '費用・条件の目安', '期待できる効果', 'ご判断'], proposals(d, own, ref).map(r => [...r, '□ お願いする\n□ 見送る'].map(c => c.includes('\n') ? c.split('\n').map(l => para(run(l, {size: 9.5}), {after: 0})) : c)), [1500, 3000, 1600, 2000, 1500]));
+    // 5. ご相談事項（2〜3案。賃料は「ご相談」として1案まで）
+    const consult = consultations(d, own, ref);
+    if (consult.length) {
+      body.push(h2(`${n()}. ご相談させていただきたいこと`));
+      body.push(p('より早いご成約に向けて、次の点をご検討いただけますと幸いです。費用や条件は、改めて担当よりご説明いたします。', {size: 9.5}));
+      body.push(table(['ご相談内容', '内容', '費用の目安', 'ご意向'], consult.map(r => [...r, '□ お願いする\n□ 今回は見送る'].map(c => c.includes('\n') ? c.split('\n').map(l => para(run(l, {size: 9.5}), {after: 0})) : c)), [1900, 4200, 1600, 1900]));
+    }
 
-    // 7. 今後の予定
-    body.push(h2(`${m ? 7 : 6}. 今後の予定`));
-    body.push(bullet([run('次回のご報告：'), memo(`${jpDate(addDays(today, 14))}ごろ（2週間後を目安）`)]));
-    body.push(bullet([run('それまでに実施すること：'), memo('例：写真の撮り直し、仲介会社10社への資料配布、次回巡回 ○月○日')]));
+    // 6. 次回
+    body.push(h2(`${n()}. 次回のご報告`));
+    body.push(para([run('次回は'), memo(`${jpDate(addDays(today, 14))}ごろ`), run('にご報告いたします。')]));
     body.push(p('ご不明な点やご要望がございましたら、担当までお気軽にお申し付けください。引き続きよろしくお願い申し上げます。', {after: 200}));
-    body.push(p('※個人名は掲載していません。反響の数は当社の記録（セルフ内見予約表）にもとづきます。相場は当社が把握している成約事例にもとづく目安です。', {size: 8.5, color: '7A8D9A'}));
+    body.push(p('※お問い合わせの件数は当社の記録にもとづきます。成約状況は当社が把握している事例にもとづく目安です。', {size: 8.5, color: '7A8D9A'}));
 
     const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
     const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr>${FONT}<w:sz w:val="21"/><w:lang w:val="en-US" w:eastAsia="ja-JP"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="80" w:line="300" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>`

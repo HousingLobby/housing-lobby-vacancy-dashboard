@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>反響レポート｜空室業務ダッシュボード</title>
   <link rel="stylesheet" href="styles.css?v=20261008auth">
-  <link rel="stylesheet" href="report.css?v=20261008e">
+  <link rel="stylesheet" href="report.css?v=20261011d">
   <script defer src="vendor/msal-browser-2.38.3.min.js"></script>
   <script defer src="config.js?v=20261008gas2"></script>
   <script defer src="auth.js?v=20261008auth"></script>
@@ -14,8 +14,9 @@
   <script defer src="api.js?v=20261011b"></script>
   <script defer src="patrol-items.js?v=20261011c"></script>
   <script defer src="vendor/jszip-3.10.1.min.js"></script>
-  <script defer src="report-docx.js?v=20261011c"></script>
-  <script defer src="report.js?v=20261011b"></script>
+  <script defer src="report-docx.js?v=20261011d"></script>
+  <script defer src="report-internal.js?v=20261011d"></script>
+  <script defer src="report.js?v=20261011d"></script>
 </head>
 <body>
   <header class="masthead no-print"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">反響レポート</span></div></div></header>
@@ -23,8 +24,8 @@
     <div class="no-print report-bar">
       <a class="back-link" id="back" href="index.html">← 部屋ページに戻る</a>
       <label>集計期間<select id="months"><option value="1">直近1か月</option><option value="3" selected>直近3か月</option><option value="6">直近6か月</option></select></label>
-      <button class="primary-button" id="print" hidden>印刷／PDF保存</button>
-      <button class="primary-button" id="docx" hidden>Word（編集用）でダウンロード</button>
+      <button class="primary-button" id="print" hidden>社内用 分析レポート（PDFで保存）</button>
+      <button class="primary-button" id="docx" hidden>オーナー様向け 報告書（Word）</button>
     </div>
     <p id="msg" class="notice no-print" role="status">レポートを作成しています…（Asanaの反響を集計するため、30秒ほどかかることがあります）</p>
     <form id="pass-form" class="panel no-print" hidden><label>巡回登録の合言葉<input id="pass" type="password" autocomplete="off"></label> <button class="primary-button">作成</button></form>

@@ -67,11 +67,13 @@
         d.brokerVisits ? `仲介業者の同行内見が${d.brokerVisits}件ありました。` : '仲介業者の同行内見の記録はありません（報告漏れがないかも確認します）。'];
     el('report').innerHTML = `
       <h1>${esc(d.property)} ${esc(d.room)}　反響レポート</h1>
+      ${window.ReportInternal ? window.ReportInternal.render(d, {patrol: lastPatrol}) : ''}
+      <h2 class="internal-divider">集計の詳細</h2>
       <p class="sub">${esc(d.area || '')}／${esc(d.management || '')}${d.layout ? '／' + esc(d.layout) : ''}${rentText(d.rent) ? '／' + rentText(d.rent) : ''}　集計期間：${fmt(d.from)}〜${fmt(d.to)}（直近${d.months}か月）　作成日：${fmt(d.to)}</p>
       <div class="kpi-row">
         <div class="kpi-box"><span>物件への反響</span><strong>${d.total}件</strong></div>
         <div class="kpi-box"><span>内見率</span><strong>${pct(d.viewed, d.total)}</strong></div>
-        <div class="kpi-box"><span>成約率</span><strong>${pct(d.applied, d.total)}</strong></div>
+        <div class="kpi-box"><span>申込率</span><strong>${pct(d.applied, d.total)}</strong></div>
         <div class="kpi-box"><span>空室期間</span><strong>${d.vacantDays == null ? '―' : d.vacantDays + '日'}</strong></div>
       </div>
       <p class="sub">反響＝種別「反響」＋「かってに内見」。同一人物は${d.people}人（件数は物件ごとの人×物件単位）。うちこの号室への反響：${d.thisRoom}件。解約日：${fmt(d.moveOut)}</p>
@@ -89,7 +91,15 @@
     el('report').hidden = false; el('print').hidden = false; el('docx').hidden = false; el('msg').hidden = true;
     lastData = d;
   };
-  let lastData = null;
+  let lastData = null, lastPatrol = null;
+  // 最新の巡回結果（社内分析とオーナー報告書の両方で使う）
+  const loadPatrol = async () => {
+    try {
+      const rec = (await api.patrols(id)).records?.[0];
+      return rec ? {date: rec.date, inspector: rec.inspector, otherIssue: rec.otherIssue,
+        issues: (window.PATROL_ITEMS || []).filter(it => rec.checks?.[it.key] === false).map(it => `${it.name}（${it.ng}）`)} : null;
+    } catch { return null; }
+  };
   const run = async passcode => {
     el('msg').hidden = false; el('msg').textContent = 'レポートを作成しています…（Asanaの反響を集計するため、30秒ほどかかることがあります）';
     try {
@@ -103,6 +113,7 @@
         }
       } catch {}
       const d = await api.reportData({task: id, months: Number(el('months').value), passcode, address});
+      lastPatrol = await loadPatrol();
       api.prefs.set({passcode}); el('pass-form').hidden = true; render(d);
     } catch (e) {
       el('report').hidden = true; el('print').hidden = true; el('docx').hidden = true;
@@ -113,18 +124,19 @@
   if (!api.configured || !id) { el('msg').textContent = '共有データに接続していないため、レポートを作成できません。'; return; }
   el('pass-form').addEventListener('submit', e => { e.preventDefault(); run(el('pass').value); });
   el('months').addEventListener('change', () => run(api.prefs.get().passcode || ''));
-  el('print').addEventListener('click', () => window.print());
+  // 社内用 分析レポート：PDFで保存（印刷画面で「PDFとして保存」）。ファイル名になるタイトルに「社内用」を入れる
+  el('print').addEventListener('click', () => {
+    const t = document.title;
+    if (lastData) document.title = `社内用_分析レポート_${lastData.property || ''}${lastData.room || ''}_${(lastData.to || '').replace(/-/g, '')}`;
+    window.print();
+    setTimeout(() => { document.title = t; }, 1000);
+  });
   // Word（編集用）：担当者が修正・加筆してからオーナー様へ送る。最新の巡回結果も入れる
   el('docx').addEventListener('click', async () => {
     if (!lastData || !window.ReportDocx) return;
     const btn = el('docx'); btn.disabled = true; btn.textContent = '作成中…';
     try {
-      let patrol = null;
-      try {
-        const rec = (await api.patrols(id)).records?.[0];
-        if (rec) patrol = {date: rec.date, inspector: rec.inspector, otherIssue: rec.otherIssue,
-          issues: (window.PATROL_ITEMS || []).filter(it => rec.checks?.[it.key] === false).map(it => `${it.name}（${it.ng}）`)};
-      } catch {}
+      const patrol = lastPatrol || await loadPatrol();
       // 巡回で登録した写真（最新の巡回から最大6枚）。取れなくても報告書は作る
       btn.textContent = '写真を取り込み中…';
       let photos = [];
@@ -147,7 +159,7 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 10000);
     } catch (e) {
       el('msg').hidden = false; el('msg').textContent = `Wordファイルを作成できませんでした：${e.message}`;
-    } finally { btn.disabled = false; btn.textContent = 'Word（編集用）でダウンロード'; }
+    } finally { btn.disabled = false; btn.textContent = 'オーナー様向け 報告書（Word）'; }
   });
   run(api.prefs.get().passcode || '');
 })();
