@@ -976,28 +976,32 @@ function patrolPhotos_(body) {
   const patrols = asanaList_('/tasks/' + body.task + '/subtasks', {opt_fields: 'name', limit: 100})
     .filter(t => /^巡回確認（\d{4}-\d{2}-\d{2}）/.test(t.name || ''))
     .sort((a, b) => b.name.localeCompare(a.name));
-  const out = [];
+  // まず添付ファイルの一覧だけ集め（新しい巡回から）、画像の中身は最後にまとめて同時に取り出す
+  const picks = [];
   for (const p of patrols) {
-    if (out.length >= limit) break;
+    if (picks.length >= limit) break;
     const date = (p.name.match(/(\d{4}-\d{2}-\d{2})/) || [])[1];
     const parents = [p].concat(asanaList_('/tasks/' + p.gid + '/subtasks', {opt_fields: 'name', limit: 100}).filter(t => t.name === CFG.otherTaskName));
     for (const parent of parents) {
-      const atts = asanaList_('/attachments', {parent: parent.gid, opt_fields: 'name,download_url,created_at', limit: 100})
-        .filter(a => /\.(jpe?g|png)$/i.test(a.name || '') && a.download_url);
-      for (const a of atts) {
-        if (out.length >= limit) break;
-        try {
-          const res = UrlFetchApp.fetch(a.download_url, {muteHttpExceptions: true});
-          if (res.getResponseCode() !== 200) continue;
-          const blob = res.getBlob();
-          if (blob.getBytes().length > 4 * 1024 * 1024) continue; // 大きすぎるものは除く
-          const key = (String(a.name).match(/_([A-Za-z]+)_\d+\.(?:jpe?g|png)$/i) || [])[1] || 'other';
-          const field = CFG.patrolFields.find(f => f.key === key);
-          out.push({date: date, item: key, label: field ? field.name : 'その他不備', name: a.name, mime: /\.png$/i.test(a.name) ? 'image/png' : 'image/jpeg', data: Utilities.base64Encode(blob.getBytes())});
-        } catch (_) { /* 1枚取れなくても続ける */ }
-      }
+      if (picks.length >= limit) break;
+      asanaList_('/attachments', {parent: parent.gid, opt_fields: 'name,download_url', limit: 100})
+        .filter(a => /\.(jpe?g|png)$/i.test(a.name || '') && a.download_url)
+        .forEach(a => { if (picks.length < limit) picks.push({date: date, att: a}); });
     }
   }
+  if (!picks.length) return {photos: []};
+  const responses = UrlFetchApp.fetchAll(picks.map(x => ({url: x.att.download_url, muteHttpExceptions: true})));
+  const out = [];
+  responses.forEach((res, i) => {
+    if (res.getResponseCode() !== 200) return;
+    const bytes = res.getBlob().getBytes();
+    if (bytes.length > 4 * 1024 * 1024) return; // 大きすぎるものは除く
+    const name = picks[i].att.name;
+    const key = (String(name).match(/_([A-Za-z]+)_\d+\.(?:jpe?g|png)$/i) || [])[1] || 'other';
+    const field = CFG.patrolFields.find(f => f.key === key);
+    out.push({date: picks[i].date, item: key, label: field ? field.name : 'その他不備', name: name,
+      mime: /\.png$/i.test(name) ? 'image/png' : 'image/jpeg', data: Utilities.base64Encode(bytes)});
+  });
   return {photos: out};
 }
 
