@@ -98,6 +98,7 @@
     <label class="check-card" data-card="${item.key}"><input type="checkbox" name="${item.key}"><span class="check-mark" aria-hidden="true">✓</span><span>${esc(item.name)}</span><span class="check-sub">✓＝${esc(item.ok)}／なし＝${esc(item.ng)}${item.task ? `→「${esc(item.task)}」` : ''}</span></label>
     <div class="photo-block" data-extra="${item.key}" hidden>
       ${item.na ? `<label class="na-toggle"><input type="checkbox" name="${item.key}__na">${esc(item.na)}</label>` : ''}
+      ${item.photo ? `<label class="photo-button">📷 ${esc(item.name)}の写真<input type="file" accept="image/*" multiple data-photo="${item.key}"></label><div class="photo-thumbs" id="thumbs-${item.key}"></div>` : ''}
     </div>`).join(''));
   const form = el('room-form');
   const valueOf = item => item.na && form.elements[`${item.key}__na`].checked ? 'na' : Boolean(form.elements[item.key].checked);
@@ -108,7 +109,7 @@
   const refreshCards = () => items.forEach(item => {
     const v = valueOf(item);
     const extra = form.querySelector(`[data-extra="${item.key}"]`);
-    extra.hidden = !item.na;
+    extra.hidden = !item.na && !item.photo;
     form.querySelector(`[data-card="${item.key}"]`).classList.toggle('is-na', v === 'na');
     if (v === 'na') form.elements[item.key].checked = false;
   });
@@ -143,7 +144,7 @@
     img.src = url;
   });
   const renderThumbs = key => {
-    const box = el('thumbs-general');
+    const box = el(key === 'general' ? 'thumbs-general' : `thumbs-${key}`);
     box.innerHTML = (photos[key] || []).map((p, i) => `<img src="${p.dataUrl}" alt="写真${i + 1}" title="押すと削除" data-remove="${key}|${i}">`).join('');
   };
   const addPhotos = async (key, files) => {
@@ -154,7 +155,7 @@
     renderThumbs(key);
   };
   form.addEventListener('change', event => {
-    const key = event.target.id === 'photo-general' ? 'general' : null;
+    const key = event.target.dataset?.photo || (event.target.id === 'photo-general' ? 'general' : null);
     if (key && event.target.files?.length) { addPhotos(key, [...event.target.files]); event.target.value = ''; }
   });
   form.addEventListener('click', event => {
@@ -164,8 +165,11 @@
     photos[key].splice(Number(index), 1);
     renderThumbs(key);
   });
-  // 写真は「その他の写真」のみ。登録時に「その他不備」タスクを作って添付する
-  const photoList = () => (photos.general || []).map(p => ({name: p.name, data: p.data}));
+  // 写真：のぼり・募集看板・管理看板は「巡回確認」に、その他の写真は「その他不備」タスクに添付する
+  const photoList = () => [
+    ...items.filter(it => it.photo).flatMap(it => (photos[it.key] || []).map(p => ({item: it.key, name: p.name, data: p.data}))),
+    ...(photos.general || []).map(p => ({item: null, name: p.name, data: p.data}))
+  ];
 
   const today = store.today();
   const message = (text, error) => {el('save-message').textContent = text; el('save-message').classList.toggle('error', Boolean(error));};
@@ -267,7 +271,8 @@
       date: el('visit-date').value,
       checks,
       keyType: el('key-type').value,
-      photoCount: photoList().length,
+      photoCount: photoList().filter(p => !p.item).length,
+      itemPhotoCount: photoList().filter(p => p.item).length,
       otherIssue: el('other-issue').value.trim(),
       note: el('visit-note').value.trim(),
       inspector: el('inspector').value.trim(),

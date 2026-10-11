@@ -125,7 +125,21 @@
         if (rec) patrol = {date: rec.date, inspector: rec.inspector, otherIssue: rec.otherIssue,
           issues: (window.PATROL_ITEMS || []).filter(it => rec.checks?.[it.key] === false).map(it => `${it.name}（${it.ng}）`)};
       } catch {}
-      const blob = await window.ReportDocx.build(lastData, {patrol});
+      // 巡回で登録した写真（最新の巡回から最大6枚）。取れなくても報告書は作る
+      btn.textContent = '写真を取り込み中…';
+      let photos = [];
+      try {
+        photos = (await api.patrolPhotos({task: id, limit: 6})).photos || [];
+        photos = await Promise.all(photos.map(ph => new Promise(resolve => {
+          const img = new Image();
+          img.onload = () => resolve({...ph, w: img.naturalWidth, h: img.naturalHeight});
+          img.onerror = () => resolve(null);
+          img.src = `data:${ph.mime};base64,${ph.data}`;
+        })));
+        photos = photos.filter(Boolean);
+      } catch {}
+      btn.textContent = '作成中…';
+      const blob = await window.ReportDocx.build(lastData, {patrol, photos});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `募集状況のご報告_${lastData.property || ''}${lastData.room || ''}_${(lastData.to || '').replace(/-/g, '')}.docx`;

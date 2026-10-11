@@ -23,6 +23,21 @@
       + '</w:tbl>' + para('', {after: 60});
   };
 
+  // 写真（巡回で登録したもの）。幅7.8cm、2枚ずつ横に並べる
+  const EMU_CM = 360000;
+  const picture = (rid, n, w, h) => {
+    const cx = Math.round(7.8 * EMU_CM), cy = Math.round(cx * (h && w ? h / w : 0.75));
+    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${n}" name="写真${n}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${n}" name="photo${n}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  };
+  const photoGrid = cells => {
+    const rows = [];
+    for (let i = 0; i < cells.length; i += 2) rows.push(cells.slice(i, i + 2));
+    const none = '<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/>';
+    return `<w:tbl><w:tblPr><w:tblW w:w="9600" w:type="dxa"/><w:tblBorders>${none}</w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="4800"/><w:gridCol w:w="4800"/></w:tblGrid>`
+      + rows.map(r => `<w:tr>${[0, 1].map(i => `<w:tc><w:tcPr><w:tcW w:w="4800" w:type="dxa"/></w:tcPr>${r[i] ? para(r[i].img, {after: 0}) + para(run(r[i].caption, {size: 8.5, color: '5C7182'}), {after: 120}) : para('', {after: 0})}</w:tc>`).join('')}</w:tr>`).join('')
+      + '</w:tbl>' + para('', {after: 60});
+  };
+
   // ---- 文言 ----
   const pct = (n, d) => d ? `${(n / d * 100).toFixed(1)}%` : '―';
   const man = v => v == null || isNaN(v) ? '―' : `${(Math.round(v * 100) / 100).toFixed(2).replace(/\.?0+$/, '')}万円`;
@@ -119,7 +134,12 @@
       else body.push(bullet(run('のぼり・看板・室内清掃などの確認項目に不備はありませんでした。')));
       if (pr.otherIssue) body.push(bullet(run(`その他：${pr.otherIssue}`)));
     } else body.push(p('巡回の記録はまだありません。'));
-    body.push(para(memo('室内・外観の写真を貼り付け（オーナー様が現地を想像できる写真を2〜4枚）')));
+    const photos = (extra.photos || []).filter(ph => ph && ph.data);
+    if (photos.length) {
+      body.push(p(`巡回で撮影した写真（${photos.length}枚）`, {bold: true}));
+      body.push(photoGrid(photos.map((ph, i) => ({img: picture(`rIdImg${i + 1}`, i + 1, ph.w, ph.h), caption: `${ph.label || '写真'}（${jpDate(ph.date)}の巡回）`}))));
+      body.push(para(memo('写真の説明（例：玄関ドアの傷は○日に補修予定）。外観・室内の写真の追加もこちらへ')));
+    } // 写真がないときは写真の欄を出さない
 
     // 5. 見立て
     body.push(h2(`${m ? 5 : 4}. 成約に至っていない理由の見立て`));
@@ -138,16 +158,17 @@
     body.push(p('ご不明な点やご要望がございましたら、担当までお気軽にお申し付けください。引き続きよろしくお願い申し上げます。', {after: 200}));
     body.push(p('※個人名は掲載していません。反響の数は当社の記録（セルフ内見予約表）にもとづきます。相場は当社が把握している成約事例にもとづく目安です。', {size: 8.5, color: '7A8D9A'}));
 
-    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
     const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr>${FONT}<w:sz w:val="21"/><w:lang w:val="en-US" w:eastAsia="ja-JP"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="80" w:line="300" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>`
       + `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>`
       + `<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="120" w:after="200"/><w:pBdr><w:bottom w:val="single" w:sz="12" w:color="1B5D85"/></w:pBdr></w:pPr><w:rPr><w:b/><w:color w:val="102841"/><w:sz w:val="34"/></w:rPr></w:style>`
       + `<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="280" w:after="100"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:color w:val="1B5D85"/><w:sz w:val="26"/></w:rPr></w:style></w:styles>`;
     const numberingXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="・"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="420" w:hanging="300"/></w:pPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>`;
     const zip = new window.JSZip();
-    zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>');
+    zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpg" ContentType="image/jpeg"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>');
     zip.file('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
-    zip.file('word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/></Relationships>');
+    zip.file('word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>' + photos.map((ph, i) => `<Relationship Id="rIdImg${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/photo${i + 1}.${ph.mime === 'image/png' ? 'png' : 'jpg'}"/>`).join('') + '</Relationships>');
+    photos.forEach((ph, i) => zip.file(`word/media/photo${i + 1}.${ph.mime === 'image/png' ? 'png' : 'jpg'}`, ph.data, {base64: true}));
     zip.file('word/document.xml', documentXml);
     zip.file('word/styles.xml', stylesXml);
     zip.file('word/numbering.xml', numberingXml);

@@ -1,9 +1,10 @@
 // 現地確認の項目。gas/Code.gs の CFG.patrolFields と同じ内容に保つこと。
+// photo＝写真を付けられる項目（設置状況の証拠として報告書に載せる。巡回確認サブタスクに添付）
 // ok＝チェックありの値、ng＝チェックなしの値（task があれば「巡回確認」の中に対応タスクを作る）、na＝「該当なし」を選べる項目
 window.PATROL_ITEMS = [
-  {key: 'nobori', name: 'のぼり', ok: 'あり', ng: 'なし', task: 'のぼりを設置'},
-  {key: 'recruitmentSign', name: '募集看板', ok: 'あり', ng: 'なし', task: '募集看板を設置'},
-  {key: 'managementSign', name: '管理看板', ok: 'あり', ng: 'なし', task: '管理看板を設置'},
+  {key: 'nobori', name: 'のぼり', ok: 'あり', ng: 'なし', task: 'のぼりを設置', photo: true},
+  {key: 'recruitmentSign', name: '募集看板', ok: 'あり', ng: 'なし', task: '募集看板を設置', photo: true},
+  {key: 'managementSign', name: '管理看板', ok: 'あり', ng: 'なし', task: '管理看板を設置', photo: true},
   {key: 'welcomeSet', name: 'ウェルカムセット', ok: 'あり', ng: 'なし', task: 'ウェルカムセットを設置'},
   {key: 'staging', name: 'ステージング', ok: 'あり', ng: 'なし', task: null},
   {key: 'roomCleaning', name: '室内清掃', ok: '済', ng: '要清掃', task: '室内清掃'},

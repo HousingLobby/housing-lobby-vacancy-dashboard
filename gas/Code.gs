@@ -52,9 +52,9 @@ const CFG = {
   // 現地確認の項目（docs/patrol-items.js と同じ内容に保つ）。Asanaの項目（プロパティ）とは連動しない
   // ok＝チェックあり、ng＝チェックなし（task があれば「巡回確認」の中に対応タスクを作る）、na＝該当なし
   patrolFields: [
-    {key: 'nobori', name: 'のぼり', ok: 'あり', ng: 'なし', task: 'のぼりを設置'},
-    {key: 'recruitmentSign', name: '募集看板', ok: 'あり', ng: 'なし', task: '募集看板を設置'},
-    {key: 'managementSign', name: '管理看板', ok: 'あり', ng: 'なし', task: '管理看板を設置'},
+    {key: 'nobori', name: 'のぼり', ok: 'あり', ng: 'なし', task: 'のぼりを設置', photo: true},
+    {key: 'recruitmentSign', name: '募集看板', ok: 'あり', ng: 'なし', task: '募集看板を設置', photo: true},
+    {key: 'managementSign', name: '管理看板', ok: 'あり', ng: 'なし', task: '管理看板を設置', photo: true},
     {key: 'welcomeSet', name: 'ウェルカムセット', ok: 'あり', ng: 'なし', task: 'ウェルカムセットを設置'},
     {key: 'staging', name: 'ステージング', ok: 'あり', ng: 'なし', task: null},
     {key: 'roomCleaning', name: '室内清掃', ok: '済', ng: '要清掃', task: '室内清掃'},
@@ -133,6 +133,7 @@ function handle_(action, body) {
     case 'lpStatus': return lpStatus_(body.task);
     case 'status': return statusInfo_();
     case 'reportData': return reportData_(body);
+    case 'patrolPhotos': return patrolPhotos_(body);
     case 'marketDebug': return marketDebug_(body);
     // 書き込み
     case 'previewPatrol': return previewPatrol_(body);
@@ -443,9 +444,10 @@ function validatePatrol_(body) {
   const keyType = String(body.keyType || '');
   if (keyType && !keyTypeOptions_().some(o => o.name === keyType)) throw new Error('鍵種別が正しくありません');
   const photoCount = Math.max(0, Math.min(CFG.maxPhotos, Number(body.photoCount) || 0));
+  const itemPhotoCount = Math.max(0, Math.min(CFG.maxPhotos, Number(body.itemPhotoCount) || 0));
   const otherIssue = String(body.otherIssue || '').trim();
   if (otherIssue.length > 1000) throw new Error('その他不備のコメントは1000文字以内にしてください');
-  return {task: body.task, date: body.date, clientId: body.clientId, inspector: inspector, note: note, checks: checks, keyType: keyType, photoCount: photoCount, otherIssue: otherIssue};
+  return {task: body.task, date: body.date, clientId: body.clientId, inspector: inspector, note: note, checks: checks, keyType: keyType, photoCount: photoCount, itemPhotoCount: itemPhotoCount, otherIssue: otherIssue};
 }
 
 // true/false/'na' ⇔ 選択肢の名前
@@ -473,6 +475,7 @@ function patrolText_(r) {
   if (r.keyType) lines.push('鍵種別：' + r.keyType);
   if (r.otherIssue) lines.push('その他不備：' + r.otherIssue.replace(/\n/g, ' '));
   if (r.photoCount) lines.push('写真：' + r.photoCount + '枚');
+  if (r.itemPhotoCount) lines.push('看板・のぼりの写真：' + r.itemPhotoCount + '枚');
   lines.push('担当：' + r.inspector);
   if (CURRENT_USER) lines.push('登録者：' + CURRENT_USER.name + '（' + CURRENT_USER.email + '）');
   if (r.note) lines.push('メモ：' + r.note);
@@ -532,6 +535,7 @@ function planFollowUps_(r, task) {
       plan.lines.push('「' + x.task + '」を完了（' + open[0].from + '）');
     }
   });
+  if (r.itemPhotoCount) plan.lines.push('「巡回確認」に、のぼり・看板の写真' + r.itemPhotoCount + '枚を添付');
   if (r.photoCount || r.otherIssue) {
     if (plan.mineChildren[CFG.otherTaskName]) plan.openByKey.other = plan.mineChildren[CFG.otherTaskName];
     else {
@@ -605,14 +609,26 @@ function savePatrol_(body) {
     const targets = applyFollowUps_(r, plan, task);
     // 写真：既に添付済みの枚数から続きだけ送る（途中で失敗した再送でも重複しない）
     let attached = 0;
-    const photoParent = targets.other || targets[''];
-    const already = photos.length && !targets.created_other
-      ? (asanaList_('/attachments', {parent: photoParent, opt_fields: 'name', limit: 100}).filter(a => /_other_\d+\.jpg$/.test(a.name || '')).length) : 0;
-    photos.slice(already).forEach((p, i) => {
-      if (!p || typeof p.data !== 'string' || p.data.length > 6000000) return;
-      asanaUpload_(photoParent, p.data, r.date + '_other_' + (already + i + 1) + '.jpg'); // 日本語名は添付で文字化けするため英字
-      attached++;
-    });
+    const ok = p => p && typeof p.data === 'string' && p.data.length <= 6000000;
+    // ① のぼり・募集看板・管理看板の写真 → 巡回確認サブタスクへ（ファイル名に項目名：YYYY-MM-DD_nobori_1.jpg）
+    const photoItems = CFG.patrolFields.filter(f => f.photo).map(f => f.key);
+    const itemPhotos = photos.filter(p => p && photoItems.indexOf(p.item) >= 0);
+    if (itemPhotos.length) {
+      const existing = asanaList_('/attachments', {parent: targets[''], opt_fields: 'name', limit: 100}).map(a => a.name || '');
+      photoItems.forEach(key => {
+        const list = itemPhotos.filter(p => p.item === key);
+        const already = existing.filter(n => new RegExp('_' + key + '_\\d+\\.jpg$').test(n)).length;
+        list.slice(already).forEach((p, i) => { if (!ok(p)) return; asanaUpload_(targets[''], p.data, r.date + '_' + key + '_' + (already + i + 1) + '.jpg'); attached++; });
+      });
+    }
+    // ② その他の写真 → 「その他不備」タスクへ（日本語名は添付で文字化けするため英字）
+    const others = photos.filter(p => p && photoItems.indexOf(p.item) < 0);
+    if (others.length) {
+      const photoParent = targets.other || targets[''];
+      const already = !targets.created_other
+        ? asanaList_('/attachments', {parent: photoParent, opt_fields: 'name', limit: 100}).filter(a => /_other_\d+\.jpg$/.test(a.name || '')).length : 0;
+      others.slice(already).forEach((p, i) => { if (!ok(p)) return; asanaUpload_(photoParent, p.data, r.date + '_other_' + (already + i + 1) + '.jpg'); attached++; });
+    }
     const dup = Boolean(plan.existingParent) && !plan.create.length && !attached;
     updatePatrolIndex_(r.task, r.date);
     CacheService.getScriptCache().remove('snapshot_n');
@@ -947,6 +963,40 @@ function notifyAdmin_(subject, body, throttleKey) {
     pr.setProperty(k, new Date().toISOString());
   }
   try { MailApp.sendEmail(to, subject, body + '\n\n（空室業務ダッシュボード GAS から自動送信）'); } catch (e) { Logger.log('通知を送れませんでした：' + e.message); }
+}
+
+/* ---------- 報告書用：巡回で登録した写真 ---------- */
+/* 物件タスク └ 巡回確認（日付） └ その他不備 に添付された写真を、新しい巡回から順に最大 limit 枚返す（base64）。
+   Asanaの添付ファイルのURLは一時的なものなので、GASで中身を取り出して画面に渡す */
+function patrolPhotos_(body) {
+  if (!/^\d+$/.test(body.task || '')) throw new Error('部屋IDが正しくありません');
+  const limit = Math.max(1, Math.min(8, Number(body.limit) || 6));
+  const patrols = asanaList_('/tasks/' + body.task + '/subtasks', {opt_fields: 'name', limit: 100})
+    .filter(t => /^巡回確認（\d{4}-\d{2}-\d{2}）/.test(t.name || ''))
+    .sort((a, b) => b.name.localeCompare(a.name));
+  const out = [];
+  for (const p of patrols) {
+    if (out.length >= limit) break;
+    const date = (p.name.match(/(\d{4}-\d{2}-\d{2})/) || [])[1];
+    const parents = [p].concat(asanaList_('/tasks/' + p.gid + '/subtasks', {opt_fields: 'name', limit: 100}).filter(t => t.name === CFG.otherTaskName));
+    for (const parent of parents) {
+      const atts = asanaList_('/attachments', {parent: parent.gid, opt_fields: 'name,download_url,created_at', limit: 100})
+        .filter(a => /\.(jpe?g|png)$/i.test(a.name || '') && a.download_url);
+      for (const a of atts) {
+        if (out.length >= limit) break;
+        try {
+          const res = UrlFetchApp.fetch(a.download_url, {muteHttpExceptions: true});
+          if (res.getResponseCode() !== 200) continue;
+          const blob = res.getBlob();
+          if (blob.getBytes().length > 4 * 1024 * 1024) continue; // 大きすぎるものは除く
+          const key = (String(a.name).match(/_([A-Za-z]+)_\d+\.(?:jpe?g|png)$/i) || [])[1] || 'other';
+          const field = CFG.patrolFields.find(f => f.key === key);
+          out.push({date: date, item: key, label: field ? field.name : 'その他不備', name: a.name, mime: /\.png$/i.test(a.name) ? 'image/png' : 'image/jpeg', data: Utilities.base64Encode(blob.getBytes())});
+        } catch (_) { /* 1枚取れなくても続ける */ }
+      }
+    }
+  }
+  return {photos: out};
 }
 
 /* ---------- GASの引っ越し（所有アカウントの変更） ---------- */

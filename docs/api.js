@@ -75,6 +75,7 @@
       return request({action: 'promotion', month, ...(refresh ? {refresh: '1'} : {})});
     },
     reportData: body => request(null, {action: 'reportData', ...body}, 120000),
+    patrolPhotos: body => request(null, {action: 'patrolPhotos', ...body}, 120000),
     lpStatus: task => request({action: 'lpStatus', task}),
     lpRequest: body => request(null, {action: 'lpRequest', ...body}),
     previewPatrol: body => request(null, {action: 'previewPatrol', ...body}),
