@@ -86,8 +86,10 @@
       <h2>状況と今後の対応</h2>
       <ul>${soft.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
       <p class="sub" style="margin-top:22px">※個人名は掲載していません。集計はAsana「セルフ内見予約表」の登録分です（アットホームは登録分のみ）。</p>`;
-    el('report').hidden = false; el('print').hidden = false; el('msg').hidden = true;
+    el('report').hidden = false; el('print').hidden = false; el('docx').hidden = false; el('msg').hidden = true;
+    lastData = d;
   };
+  let lastData = null;
   const run = async passcode => {
     el('msg').hidden = false; el('msg').textContent = 'レポートを作成しています…（Asanaの反響を集計するため、30秒ほどかかることがあります）';
     try {
@@ -103,7 +105,7 @@
       const d = await api.reportData({task: id, months: Number(el('months').value), passcode, address});
       api.prefs.set({passcode}); el('pass-form').hidden = true; render(d);
     } catch (e) {
-      el('report').hidden = true; el('print').hidden = true;
+      el('report').hidden = true; el('print').hidden = true; el('docx').hidden = true;
       el('msg').textContent = e.message || '作成できませんでした';
       if (/合言葉/.test(e.message || '')) el('pass-form').hidden = false;
     }
@@ -112,5 +114,26 @@
   el('pass-form').addEventListener('submit', e => { e.preventDefault(); run(el('pass').value); });
   el('months').addEventListener('change', () => run(api.prefs.get().passcode || ''));
   el('print').addEventListener('click', () => window.print());
+  // Word（編集用）：担当者が修正・加筆してからオーナー様へ送る。最新の巡回結果も入れる
+  el('docx').addEventListener('click', async () => {
+    if (!lastData || !window.ReportDocx) return;
+    const btn = el('docx'); btn.disabled = true; btn.textContent = '作成中…';
+    try {
+      let patrol = null;
+      try {
+        const rec = (await api.patrols(id)).records?.[0];
+        if (rec) patrol = {date: rec.date, inspector: rec.inspector, otherIssue: rec.otherIssue,
+          issues: (window.PATROL_ITEMS || []).filter(it => rec.checks?.[it.key] === false).map(it => `${it.name}（${it.ng}）`)};
+      } catch {}
+      const blob = await window.ReportDocx.build(lastData, {patrol});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `募集状況のご報告_${lastData.property || ''}${lastData.room || ''}_${(lastData.to || '').replace(/-/g, '')}.docx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    } catch (e) {
+      el('msg').hidden = false; el('msg').textContent = `Wordファイルを作成できませんでした：${e.message}`;
+    } finally { btn.disabled = false; btn.textContent = 'Word（編集用）でダウンロード'; }
+  });
   run(api.prefs.get().passcode || '');
 })();

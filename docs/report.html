@@ -12,7 +12,10 @@
   <script defer src="snapshot-current.js?v=20261008auth"></script>
   <script defer src="patrol-store.js?v=20261002"></script>
   <script defer src="api.js?v=20261008gas3"></script>
-  <script defer src="report.js?v=20261008auth"></script>
+  <script defer src="patrol-items.js?v=20261011"></script>
+  <script defer src="vendor/jszip-3.10.1.min.js"></script>
+  <script defer src="report-docx.js?v=20261011"></script>
+  <script defer src="report.js?v=20261011"></script>
 </head>
 <body>
   <header class="masthead no-print"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">反響レポート</span></div></div></header>
@@ -21,6 +24,7 @@
       <a class="back-link" id="back" href="index.html">← 部屋ページに戻る</a>
       <label>集計期間<select id="months"><option value="1">直近1か月</option><option value="3" selected>直近3か月</option><option value="6">直近6か月</option></select></label>
       <button class="primary-button" id="print" hidden>印刷／PDF保存</button>
+      <button class="primary-button" id="docx" hidden>Word（編集用）でダウンロード</button>
     </div>
     <p id="msg" class="notice no-print" role="status">レポートを作成しています…（Asanaの反響を集計するため、30秒ほどかかることがあります）</p>
     <form id="pass-form" class="panel no-print" hidden><label>巡回登録の合言葉<input id="pass" type="password" autocomplete="off"></label> <button class="primary-button">作成</button></form>
