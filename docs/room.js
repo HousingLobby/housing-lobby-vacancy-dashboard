@@ -109,7 +109,8 @@
   const refreshCards = () => items.forEach(item => {
     const v = valueOf(item);
     const extra = form.querySelector(`[data-extra="${item.key}"]`);
-    extra.hidden = !item.na && !item.photo;
+    // 写真ボタン（のぼり・募集看板・管理看板）は「あり」にチェックしたときだけ出す
+    extra.hidden = !item.na && !(item.photo && v === true);
     form.querySelector(`[data-card="${item.key}"]`).classList.toggle('is-na', v === 'na');
     if (v === 'na') form.elements[item.key].checked = false;
   });
@@ -167,7 +168,7 @@
   });
   // 写真：のぼり・募集看板・管理看板は「巡回確認」に、その他の写真は「その他不備」タスクに添付する
   const photoList = () => [
-    ...items.filter(it => it.photo).flatMap(it => (photos[it.key] || []).map(p => ({item: it.key, name: p.name, data: p.data}))),
+    ...items.filter(it => it.photo && valueOf(it) === true).flatMap(it => (photos[it.key] || []).map(p => ({item: it.key, name: p.name, data: p.data}))),
     ...(photos.general || []).map(p => ({item: null, name: p.name, data: p.data}))
   ];
 
