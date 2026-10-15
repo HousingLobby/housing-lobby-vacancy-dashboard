@@ -538,6 +538,7 @@ function planFollowUps_(r, task) {
     }
   });
   if (r.itemPhotoCount) plan.lines.push('「巡回確認」に、のぼり・看板の写真' + r.itemPhotoCount + '枚を添付');
+  if (r.itemPhotoCount || r.photoCount) plan.lines.push('物件タスクにも写真' + ((r.itemPhotoCount || 0) + (r.photoCount || 0)) + '枚を添付');
   if (r.photoCount || r.otherIssue) {
     if (plan.mineChildren[CFG.otherTaskName]) plan.openByKey.other = plan.mineChildren[CFG.otherTaskName];
     else {
@@ -630,6 +631,19 @@ function savePatrol_(body) {
       const already = !targets.created_other
         ? asanaList_('/attachments', {parent: photoParent, opt_fields: 'name', limit: 100}).filter(a => /_other_\d+\.jpg$/.test(a.name || '')).length : 0;
       others.slice(already).forEach((p, i) => { if (!ok(p)) return; asanaUpload_(photoParent, p.data, r.date + '_other_' + (already + i + 1) + '.jpg'); attached++; });
+    }
+    // ③ 同じ写真を物件タスク本体にも添付（【空室一覧】のプロジェクト上で、タスクを開くとすぐ見えるように）。
+    //    ファイル名 YYYY-MM-DD_patrol_<項目>_N.jpg。再送時は付いている枚数の続きだけ送る。項目（プロパティ）には触れない
+    const sendable = photos.filter(ok);
+    if (sendable.length) {
+      const onTask = asanaList_('/attachments', {parent: r.task, opt_fields: 'name', limit: 100}).map(x => x.name || '');
+      const groups = {};
+      sendable.forEach(p => { const k = photoItems.indexOf(p.item) >= 0 ? p.item : 'other'; (groups[k] = groups[k] || []).push(p); });
+      Object.keys(groups).forEach(k => {
+        const prefix = r.date + '_patrol_' + k + '_';
+        const already = onTask.filter(n => n.indexOf(prefix) === 0).length;
+        groups[k].slice(already).forEach((p, i) => { asanaUpload_(r.task, p.data, prefix + (already + i + 1) + '.jpg'); attached++; });
+      });
     }
     const dup = Boolean(plan.existingParent) && !plan.create.length && !attached;
     updatePatrolIndex_(r.task, r.date);
