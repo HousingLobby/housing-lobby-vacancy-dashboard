@@ -42,7 +42,7 @@
     const t = c.at ? new Date(c.at).toLocaleString('ja-JP', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : '';
     const busy = c.state === '依頼中' || c.state === '実行中';
     btn.disabled = busy;
-    const text = {'依頼中': 'Macの処理を待っています…', '実行中': 'JDSから取り込み中…', '完了': `${t} ${({A: '県央店（諫早）', B: '長崎店'})[c.store] || ''}を確認しました（新規${c.added || 0}件・更新${c.updated || 0}件）`, '失敗': `${t} 取り込めませんでした：${c.message || '原因不明'}`}[c.state] || '';
+    const text = {'依頼中': '依頼しました。Macで「反響データ確認」を実行すると取り込まれます', '実行中': 'JDSから取り込み中…', '完了': `${t} ${({A: '県央店（諫早）', B: '長崎店'})[c.store] || ''}を確認しました（新規${c.added || 0}件・更新${c.updated || 0}件）`, '失敗': `${t} 取り込めませんでした：${c.message || '原因不明'}`}[c.state] || '';
     el.textContent = text; el.className = 'save-message' + (c.state === '失敗' ? ' error' : '');
     clearTimeout(pollTimer);
     if (busy) pollTimer = setTimeout(pollCheck, 10000);
