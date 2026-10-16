@@ -124,7 +124,7 @@ function readRequest_(e) {
 }
 
 // 認証の要らない入口（機械用・稼働確認）
-const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true};
+const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true};
 
 function handle_(action, body) {
   switch (action) {
@@ -146,6 +146,11 @@ function handle_(action, body) {
     // 機械用（専用の鍵で確認）
     case 'lpQueue': return lpQueue_(body.key);
     case 'lpUpdate': return lpUpdate_(body);
+    case 'hankyoUpsert': return hankyoUpsert_(body);
+    // 反響対応（ログイン必須）
+    case 'hankyoList': return hankyoList_();
+    case 'hankyoGet': return hankyoGet_(body.id);
+    case 'hankyoUpdate': return hankyoUpdate_(body);
     default: throw new Error('不明な操作です');
   }
 }
@@ -966,6 +971,7 @@ function dailyJob() {
   const latest = Object.keys(readManagement_()).sort().pop();
   const expected = (() => { const [y, m] = todayJst_().split('-').map(Number); return new Date(Date.UTC(y, m - 3, 1)).toISOString().slice(0, 7); })();
   if (!latest || latest < expected) errors.push('管理戸数が古いままです（最新：' + (latest || 'なし') + '）');
+  try { hankyoPurge_(); } catch (e) { errors.push('反響の期限切れ削除：' + e.message); }
   if (errors.length) notifyAdmin_('空室業務ダッシュボード：要確認', errors.join('\n'));
 }
 
@@ -1412,4 +1418,128 @@ function marketDebug_(body) {
     return {name: sh.getName(), rows: v.length - 1, header: v[0] ? v[0].slice(0, 8).map(String) : [], byCity: byCity,
       sampleDate: v[1] ? String(v[1][6]).slice(0, 30) : null};
   })};
+}
+
+
+/* ---------- 反響対応（SUUMO反響→お客様ごとの記録・返信文の下書き） ---------- */
+// 保存先＝会社Googleアカウントのスプレッドシート（初回に自動作成。ID＝スクリプトプロパティ HANKYO_SHEET_ID）。
+// 個人情報（氏名・メール・TEL・問い合わせ内容・返信文）は受付日から40日で削除。月ごとの件数（数字のみ）だけ残す（HANKYO_COUNTS）。
+// 書き込み（取り込み）は Mac 側の Claude が LP_WORKER_KEY で行う。画面（ログイン済みの社内ユーザー）は読み取りと状態・返信文の更新だけ。送信はしない。
+
+const HANKYO_KEEP_DAYS = 40;
+const HANKYO_HEAD = ['id', '受付日', '顧客名', 'メール', 'TEL', '店舗', '物件名', '号室', '問い合わせ内容', '現況', 'LP', '返信文', '状態', '登録', '更新'];
+
+function hankyoSheet_() {
+  const pr = PropertiesService.getScriptProperties();
+  let id = pr.getProperty('HANKYO_SHEET_ID');
+  let ss;
+  if (id) ss = SpreadsheetApp.openById(id);
+  else {
+    ss = SpreadsheetApp.create('反響対応（保存40日・個人情報）');
+    pr.setProperty('HANKYO_SHEET_ID', ss.getId());
+    ss.getSheets()[0].setName('反響');
+  }
+  const sh = ss.getSheetByName('反響') || ss.getSheets()[0];
+  if (sh.getLastRow() === 0) { sh.getRange(1, 1, 1, HANKYO_HEAD.length).setValues([HANKYO_HEAD]); sh.setFrozenRows(1); sh.getRange(1, 1, sh.getMaxRows(), HANKYO_HEAD.length).setNumberFormat('@'); } // 全列を文字列に（電話番号の先頭0・日付の自動変換を防ぐ）
+  return sh;
+}
+
+function hankyoRows_(sh) {
+  const n = sh.getLastRow();
+  if (n < 2) return [];
+  return sh.getRange(2, 1, n - 1, HANKYO_HEAD.length).getValues().map((r, i) => {
+    const o = {row: i + 2};
+    HANKYO_HEAD.forEach((h, j) => { o[h] = r[j] instanceof Date ? Utilities.formatDate(r[j], 'Asia/Tokyo', 'yyyy-MM-dd') : r[j]; });
+    return o;
+  });
+}
+
+function hankyoCounts_() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('HANKYO_COUNTS') || '{}'); } catch (_) { return {}; } }
+
+function hankyoClean_(v, max) { return String(v == null ? '' : v).slice(0, max || 500); }
+
+// 受付日から40日たった行を削除（件数は残る）
+function hankyoPurge_() {
+  const sh = hankyoSheet_();
+  const limit = new Date(Date.now() - HANKYO_KEEP_DAYS * 86400000);
+  const lim = Utilities.formatDate(limit, 'Asia/Tokyo', 'yyyy-MM-dd');
+  const rows = hankyoRows_(sh).filter(r => String(r['受付日']) < lim).map(r => r.row).sort((a, b) => b - a);
+  rows.forEach(r => sh.deleteRow(r));
+  return rows.length;
+}
+
+// Claude が呼ぶ：items=[{id,date,name,email,tel,store,property,room,message,status,lp,reply}]。idが既にあれば更新、なければ追加（件数は追加時に1回だけ数える）
+function hankyoUpsert_(body) {
+  lpWorkerOk_(body.key);
+  const items = Array.isArray(body.items) ? body.items.slice(0, 50) : [];
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = hankyoSheet_();
+    const rows = hankyoRows_(sh);
+    const byId = {};
+    rows.forEach(r => { byId[r.id] = r; });
+    const counts = hankyoCounts_();
+    const now = new Date().toISOString();
+    let added = 0, updated = 0;
+    items.forEach(it => {
+      const id = hankyoClean_(it.id, 60);
+      if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(String(it.date || ''))) return;
+      const vals = {id: id, '受付日': it.date, '顧客名': hankyoClean_(it.name, 80), 'メール': hankyoClean_(it.email, 120), 'TEL': hankyoClean_(it.tel, 40),
+        '店舗': hankyoClean_(it.store, 10), '物件名': hankyoClean_(it.property, 120), '号室': hankyoClean_(it.room, 30), '問い合わせ内容': hankyoClean_(it.message, 2000),
+        '現況': hankyoClean_(it.status, 60), 'LP': hankyoClean_(it.lp, 300), '返信文': hankyoClean_(it.reply, 8000)};
+      const cur = byId[id];
+      if (cur) {
+        const row = HANKYO_HEAD.map(h => h === '更新' ? now : h === '状態' || h === '登録' ? cur[h] : (vals[h] !== undefined && vals[h] !== '' ? vals[h] : cur[h]));
+        sh.getRange(cur.row, 1, 1, HANKYO_HEAD.length).setValues([row]);
+        updated++;
+      } else {
+        sh.appendRow(HANKYO_HEAD.map(h => h === '状態' ? '未返信' : h === '登録' || h === '更新' ? now : vals[h]));
+        const ym = String(it.date).slice(0, 7), c = counts[ym] || {t: 0, A: 0, B: 0};
+        c.t++; if (c[vals['店舗']] !== undefined) c[vals['店舗']]++;
+        counts[ym] = c;
+        added++;
+      }
+    });
+    PropertiesService.getScriptProperties().setProperty('HANKYO_COUNTS', JSON.stringify(counts));
+    return {ok: true, added: added, updated: updated};
+  } finally { lock.releaseLock(); }
+}
+
+// 一覧（氏名・物件・状態・受付日のみ。メール・TEL・返信文は個別ページで返す）＋月ごとの件数
+function hankyoList_() {
+  try { hankyoPurge_(); } catch (_) {}
+  const rows = hankyoRows_(hankyoSheet_()).sort((a, b) => String(b['受付日']).localeCompare(String(a['受付日'])) || b.row - a.row);
+  return {
+    keepDays: HANKYO_KEEP_DAYS,
+    items: rows.map(r => ({id: r.id, date: r['受付日'], name: r['顧客名'], store: r['店舗'], property: r['物件名'], room: r['号室'], state: r['状態'], hasReply: Boolean(r['返信文'])})),
+    counts: hankyoCounts_()
+  };
+}
+
+function hankyoGet_(id) {
+  const r = hankyoRows_(hankyoSheet_()).find(x => x.id === String(id || ''));
+  if (!r) throw new Error('このお客様の記録は見つかりません（受付日から' + HANKYO_KEEP_DAYS + '日たつと削除されます）');
+  const d = new Date(String(r['受付日']) + 'T00:00:00+09:00');
+  const expire = Utilities.formatDate(new Date(d.getTime() + HANKYO_KEEP_DAYS * 86400000), 'Asia/Tokyo', 'yyyy-MM-dd');
+  return {id: r.id, date: r['受付日'], name: r['顧客名'], email: r['メール'], tel: r['TEL'], store: r['店舗'], property: r['物件名'], room: r['号室'],
+    message: r['問い合わせ内容'], status: r['現況'], lp: r['LP'], reply: r['返信文'], state: r['状態'], updated: r['更新'], expire: expire};
+}
+
+// 画面から：状態（未返信／返信済）と返信文の手直しだけ保存できる
+function hankyoUpdate_(body) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = hankyoSheet_();
+    const r = hankyoRows_(sh).find(x => x.id === String(body.id || ''));
+    if (!r) throw new Error('記録が見つかりません');
+    if (body.state !== undefined) {
+      if (['未返信', '返信済'].indexOf(body.state) < 0) throw new Error('状態が不正です');
+      sh.getRange(r.row, HANKYO_HEAD.indexOf('状態') + 1).setValue(body.state);
+    }
+    if (body.reply !== undefined) sh.getRange(r.row, HANKYO_HEAD.indexOf('返信文') + 1).setValue(hankyoClean_(body.reply, 8000));
+    sh.getRange(r.row, HANKYO_HEAD.indexOf('更新') + 1).setValue(new Date().toISOString());
+    return {ok: true};
+  } finally { lock.releaseLock(); }
 }

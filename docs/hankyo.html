@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102841">
+  <title>反響対応｜空室業務ダッシュボード</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%23102841'/%3E%3Cpath d='M12 31 32 14l20 17v21H12z' fill='none' stroke='%23f4bb61' stroke-width='5' stroke-linejoin='round'/%3E%3Cpath d='M26 52V36h12v16' fill='none' stroke='%23f4bb61' stroke-width='5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css?v=20261016">
+  <script defer src="vendor/msal-browser-2.38.3.min.js"></script>
+  <script defer src="config.js?v=20261008gas2"></script>
+  <script defer src="auth.js?v=20261011e"></script>
+  <script defer src="api.js?v=20261016"></script>
+  <script defer src="hankyo.js?v=20261016"></script>
+</head>
+<body>
+  <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
+  <main class="shell room-shell">
+    <a class="back-link" id="back-link" href="index.html">← ダッシュボードに戻る</a>
+    <section id="list-view">
+      <div class="section-heading"><div><p class="eyebrow">INQUIRIES</p><h1>反響対応</h1></div><p class="section-meta" id="keep-note"></p></div>
+      <div class="hk-counts" id="counts"></div>
+      <div class="panel">
+        <div class="panel-heading"><h2>お客様一覧</h2><span id="list-count"></span></div>
+        <div class="filters"><label>状態<select id="state-filter"><option value="all">すべて</option><option value="未返信">未返信</option><option value="返信済">返信済</option></select></label><label class="search-field">お客様名・物件名<input id="search" type="search" placeholder="名前や物件名で検索"></label></div>
+        <div class="table-scroll"><table class="list-table"><thead><tr><th>受付日</th><th>お客様</th><th>お問い合わせ物件</th><th>店舗</th><th>返信文</th><th>状態</th></tr></thead><tbody id="list-body"></tbody></table></div>
+      </div>
+      <p class="footnote">お客様の情報（氏名・メール・電話・返信文）は受付日から40日で自動削除されます。月ごとの件数だけが残ります。メールの送信はこの画面では行いません。</p>
+    </section>
+    <section id="detail-view" hidden>
+      <div class="section-heading"><div><p class="eyebrow">CUSTOMER</p><h1 id="d-title"></h1><p class="room-subline" id="d-sub"></p></div><div class="head-actions"><span id="d-state"></span><button type="button" class="secondary-button" id="d-toggle"></button></div></div>
+      <div class="hk-detail">
+        <div>
+          <section class="panel"><div class="panel-heading"><h2>お客様・物件</h2></div>
+            <dl class="hk-dl" id="d-dl"></dl></section>
+          <section class="panel"><div class="panel-heading"><h2>お問い合わせ内容</h2></div><div class="hk-msg" id="d-msg"></div></section>
+        </div>
+        <section class="panel"><div class="panel-heading"><h2>返信文（下書き）</h2><span>直してからコピーして、メールソフトで送信</span></div>
+          <textarea class="hk-reply" id="d-reply" aria-label="返信文"></textarea>
+          <div class="button-row" style="margin-top:12px"><button type="button" class="primary-button" id="d-copy">返信文をコピー</button><button type="button" class="secondary-button" id="d-save">手直しを保存</button></div>
+          <p class="save-message" id="d-message" role="status"></p>
+        </section>
+      </div>
+      <p class="footnote" id="d-expire"></p>
+    </section>
+    <p class="notice" id="error" hidden></p>
+  </main>
+</body>
+</html>

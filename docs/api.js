@@ -83,6 +83,9 @@
     previewPatrol: body => request(null, {action: 'previewPatrol', ...body}),
     savePatrol: (body, opts) => request(null, {action: 'savePatrol', ...body}, 90000, opts),
     setManagement: body => request(null, {action: 'setManagement', ...body}),
+    hankyoList: () => request({action: 'hankyoList'}),
+    hankyoGet: id => request({action: 'hankyoGet', id}),
+    hankyoUpdate: body => request(null, {action: 'hankyoUpdate', ...body}),
     newId: () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`)
   };
 })();
