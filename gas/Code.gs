@@ -124,6 +124,9 @@ function readRequest_(e) {
 }
 
 // 認証の要らない入口（機械用・稼働確認）
+// 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
+const APP_VERSION = '2026-10-16-hankyo-subject';
+
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true};
 
 function handle_(action, body) {
@@ -167,7 +170,7 @@ function doGet(e) {
   const p = (e && e.parameter) || {};
   try {
     if (p.action === 'lpQueue') return json_(lpQueue_(p.key));               // 機械用
-    if (p.action === 'ping') return json_({ok: true, loginRequired: loginRequired_()}); // 稼働確認（データなし）
+    if (p.action === 'ping') return json_({ok: true, loginRequired: loginRequired_(), version: APP_VERSION}); // 稼働確認（データなし）
     // データを返す入口は、ログイン必須の設定ではPOST（本文にトークン）だけにする。URLにトークンを載せない
     if (loginRequired_()) return json_({error: AUTH_ERROR, auth: true});
     if (p.action === 'ping_full') return json_(statusInfo_());
