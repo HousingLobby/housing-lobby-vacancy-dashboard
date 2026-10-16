@@ -32,13 +32,17 @@
 
   // 反響データ確認（JDSからの取り込み依頼）
   let pollTimer = null;
+  function renderLast(l) {
+    const fmt = iso => iso ? new Date(iso).toLocaleString('ja-JP', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : '未確認';
+    $('check-last').innerHTML = `<span class="badge ${l.B ? 'good' : 'warn'}">長崎店：${fmt(l.B)}</span> <span class="badge ${l.A ? 'good' : 'warn'}">県央店（諫早）：${fmt(l.A)}</span>`;
+  }
   function renderCheck(c) {
     const el = $('check-status'), btn = $('check-btn');
     if (!c) { el.textContent = ''; el.className = 'save-message'; btn.disabled = false; return; }
     const t = c.at ? new Date(c.at).toLocaleString('ja-JP', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : '';
     const busy = c.state === '依頼中' || c.state === '実行中';
     btn.disabled = busy;
-    const text = {'依頼中': 'Macの処理を待っています…', '実行中': 'JDSから取り込み中…', '完了': `${t} 確認しました（新規${c.added || 0}件・更新${c.updated || 0}件）`, '失敗': `${t} 取り込めませんでした：${c.message || '原因不明'}`}[c.state] || '';
+    const text = {'依頼中': 'Macの処理を待っています…', '実行中': 'JDSから取り込み中…', '完了': `${t} ${({A: '県央店（諫早）', B: '長崎店'})[c.store] || ''}を確認しました（新規${c.added || 0}件・更新${c.updated || 0}件）`, '失敗': `${t} 取り込めませんでした：${c.message || '原因不明'}`}[c.state] || '';
     el.textContent = text; el.className = 'save-message' + (c.state === '失敗' ? ' error' : '');
     clearTimeout(pollTimer);
     if (busy) pollTimer = setTimeout(pollCheck, 10000);
@@ -51,7 +55,7 @@
     try {
       list = await Api.hankyoList();
       $('keep-note').textContent = `お客様の情報は受付日から${list.keepDays}日保存`;
-      renderCounts(); renderList(); renderCheck(list.check); showError('');
+      renderCounts(); renderList(); renderCheck(list.check); renderLast(list.lastChecked || {}); showError('');
     } catch (e) { showError('反響の一覧を取得できませんでした：' + e.message); }
   }
 

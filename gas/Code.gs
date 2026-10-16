@@ -1531,7 +1531,8 @@ function hankyoList_() {
     keepDays: HANKYO_KEEP_DAYS,
     items: rows.map(r => ({id: r.id, date: r['受付日'], name: r['顧客名'], store: r['店舗'], property: r['物件名'], room: r['号室'], state: r['状態'], hasReply: Boolean(r['返信文'])})),
     counts: hankyoCounts_(),
-    check: hankyoCheckGet__()
+    check: hankyoCheckGet__(),
+    lastChecked: hankyoLastGet__()
   };
 }
 
@@ -1569,6 +1570,7 @@ function hankyoUpdate_(body) {
 function hankyoCheckGet__() {
   try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('HANKYO_CHECK') || 'null'); } catch (_) { return null; }
 }
+function hankyoLastGet__() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('HANKYO_LAST') || '{}'); } catch (_) { return {}; } }
 function hankyoCheckPut__(o) { PropertiesService.getScriptProperties().setProperty('HANKYO_CHECK', JSON.stringify(o)); }
 
 function hankyoCheckRequest_() {
@@ -1593,7 +1595,9 @@ function hankyoCheckUpdate_(body) {
   lpWorkerOk_(body.key);
   if (['実行中', '完了', '失敗'].indexOf(body.state) < 0) throw new Error('状態が不正です');
   const cur = hankyoCheckGet__() || {};
+  const store = ['A', 'B'].indexOf(body.store) >= 0 ? body.store : '';
   hankyoCheckPut__({state: body.state, at: new Date().toISOString(), by: cur.by || '', message: hankyoClean_(body.message, 200),
-    added: Number(body.added) || 0, updated: Number(body.updated) || 0, found: Number(body.found) || 0});
+    added: Number(body.added) || 0, updated: Number(body.updated) || 0, found: Number(body.found) || 0, store: store});
+  if (body.state === '完了' && store) { const l = hankyoLastGet__(); l[store] = new Date().toISOString(); PropertiesService.getScriptProperties().setProperty('HANKYO_LAST', JSON.stringify(l)); }
   return {ok: true};
 }
