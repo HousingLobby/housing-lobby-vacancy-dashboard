@@ -127,7 +127,7 @@ function readRequest_(e) {
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
 const APP_VERSION = '2026-10-16-hankyo-subject';
 
-const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true};
+const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true};
 
 function handle_(action, body) {
   switch (action) {
@@ -151,6 +151,10 @@ function handle_(action, body) {
     case 'lpUpdate': return lpUpdate_(body);
     case 'hankyoUpsert': return hankyoUpsert_(body);
     // 反響対応（ログイン必須）
+    case 'hankyoCheckRequest': return hankyoCheckRequest_();
+    case 'hankyoCheckStatus': return {check: hankyoCheckGet__()};
+    case 'hankyoCheckGet': return hankyoCheckWorkerGet_(body.key);
+    case 'hankyoCheckUpdate': return hankyoCheckUpdate_(body);
     case 'hankyoList': return hankyoList_();
     case 'hankyoGet': return hankyoGet_(body.id);
     case 'hankyoUpdate': return hankyoUpdate_(body);
@@ -1526,7 +1530,8 @@ function hankyoList_() {
   return {
     keepDays: HANKYO_KEEP_DAYS,
     items: rows.map(r => ({id: r.id, date: r['受付日'], name: r['顧客名'], store: r['店舗'], property: r['物件名'], room: r['号室'], state: r['状態'], hasReply: Boolean(r['返信文'])})),
-    counts: hankyoCounts_()
+    counts: hankyoCounts_(),
+    check: hankyoCheckGet__()
   };
 }
 
@@ -1555,4 +1560,40 @@ function hankyoUpdate_(body) {
     sh.getRange(r.row, HANKYO_HEAD.indexOf('更新') + 1).setValue(new Date().toISOString());
     return {ok: true};
   } finally { lock.releaseLock(); }
+}
+
+
+/* ---------- 反響データ確認（ボタン→待ち行列→Mac側のClaudeがJDSから取り込む） ---------- */
+// 状態はスクリプトプロパティ HANKYO_CHECK（{state: 依頼中|実行中|完了|失敗, at, by, message, added, updated}）。JDSはログイン済みブラウザからしか見られないため、取り込みはMac側の定期処理（hankyo-check-worker）が行う
+
+function hankyoCheckGet__() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('HANKYO_CHECK') || 'null'); } catch (_) { return null; }
+}
+function hankyoCheckPut__(o) { PropertiesService.getScriptProperties().setProperty('HANKYO_CHECK', JSON.stringify(o)); }
+
+function hankyoCheckRequest_() {
+  const cur = hankyoCheckGet__();
+  // 依頼中・実行中は重ねない（実行中が30分以上続いたら止まったものとみなして出し直せる）
+  if (cur && (cur.state === '依頼中' || (cur.state === '実行中' && Date.now() - new Date(cur.at).getTime() < 30 * 60000))) return {check: cur};
+  const o = {state: '依頼中', at: new Date().toISOString(), by: CURRENT_USER ? CURRENT_USER.name : ''};
+  hankyoCheckPut__(o);
+  return {check: o};
+}
+
+// Mac側が呼ぶ：依頼があれば返す（既に取り込み済みのid一覧つき）
+function hankyoCheckWorkerGet_(key) {
+  lpWorkerOk_(key);
+  const cur = hankyoCheckGet__();
+  if (!cur || cur.state !== '依頼中') return {request: null};
+  const ids = hankyoRows_(hankyoSheet_()).map(r => r.id);
+  return {request: cur, known: ids};
+}
+
+function hankyoCheckUpdate_(body) {
+  lpWorkerOk_(body.key);
+  if (['実行中', '完了', '失敗'].indexOf(body.state) < 0) throw new Error('状態が不正です');
+  const cur = hankyoCheckGet__() || {};
+  hankyoCheckPut__({state: body.state, at: new Date().toISOString(), by: cur.by || '', message: hankyoClean_(body.message, 200),
+    added: Number(body.added) || 0, updated: Number(body.updated) || 0, found: Number(body.found) || 0});
+  return {ok: true};
 }

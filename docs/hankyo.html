@@ -10,8 +10,8 @@
   <script defer src="vendor/msal-browser-2.38.3.min.js"></script>
   <script defer src="config.js?v=20261008gas2"></script>
   <script defer src="auth.js?v=20261011e"></script>
-  <script defer src="api.js?v=20261016"></script>
-  <script defer src="hankyo.js?v=20261016c"></script>
+  <script defer src="api.js?v=20261016b"></script>
+  <script defer src="hankyo.js?v=20261016d"></script>
 </head>
 <body>
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
@@ -20,6 +20,12 @@
     <section id="list-view">
       <div class="section-heading"><div><p class="eyebrow">INQUIRIES</p><h1>反響対応</h1></div><p class="section-meta" id="keep-note"></p></div>
       <div class="hk-counts" id="counts"></div>
+      <div class="panel hk-check">
+        <div class="panel-heading"><h2>反響データ確認</h2><span>JDSの反響を取り込みます</span></div>
+        <p class="notice" style="margin:0 0 12px">※JDSサイトにログインしてください（ログインしたあとにボタンを押してください）</p>
+        <div class="button-row"><button type="button" class="primary-button" id="check-btn">反響データ確認</button><span class="save-message" id="check-status" role="status"></span></div>
+        <p class="footnote" style="margin:8px 0 0">Macの自動処理がJDSを確認し、新しい反響をこの一覧に追加します（数分かかります）。取り込んだ反響の返信文は、「スーモ」の対応で作成します。</p>
+      </div>
       <div class="panel">
         <div class="panel-heading"><h2>お客様一覧</h2><span id="list-count"></span></div>
         <div class="filters"><label>状態<select id="state-filter"><option value="all">すべて</option><option value="未返信">未返信</option><option value="返信済">返信済</option></select></label><label class="search-field">お客様名・物件名<input id="search" type="search" placeholder="名前や物件名で検索"></label></div>

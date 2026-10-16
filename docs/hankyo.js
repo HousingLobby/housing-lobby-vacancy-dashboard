@@ -30,11 +30,28 @@
     document.querySelectorAll('.hk-row').forEach(tr => tr.addEventListener('click', e => { if (e.target.tagName !== 'A') location.hash = tr.querySelector('a').getAttribute('href'); }));
   }
 
+  // 反響データ確認（JDSからの取り込み依頼）
+  let pollTimer = null;
+  function renderCheck(c) {
+    const el = $('check-status'), btn = $('check-btn');
+    if (!c) { el.textContent = ''; el.className = 'save-message'; btn.disabled = false; return; }
+    const t = c.at ? new Date(c.at).toLocaleString('ja-JP', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : '';
+    const busy = c.state === '依頼中' || c.state === '実行中';
+    btn.disabled = busy;
+    const text = {'依頼中': 'Macの処理を待っています…', '実行中': 'JDSから取り込み中…', '完了': `${t} 確認しました（新規${c.added || 0}件・更新${c.updated || 0}件）`, '失敗': `${t} 取り込めませんでした：${c.message || '原因不明'}`}[c.state] || '';
+    el.textContent = text; el.className = 'save-message' + (c.state === '失敗' ? ' error' : '');
+    clearTimeout(pollTimer);
+    if (busy) pollTimer = setTimeout(pollCheck, 10000);
+  }
+  async function pollCheck() {
+    try { const prev = $('check-status').textContent; const r = await Api.hankyoCheckStatus(); renderCheck(r.check); if (r.check && r.check.state === '完了') { list = null; await loadList(); } } catch (e) { pollTimer = setTimeout(pollCheck, 20000); }
+  }
+
   async function loadList() {
     try {
       list = await Api.hankyoList();
       $('keep-note').textContent = `お客様の情報は受付日から${list.keepDays}日保存`;
-      renderCounts(); renderList(); showError('');
+      renderCounts(); renderList(); renderCheck(list.check); showError('');
     } catch (e) { showError('反響の一覧を取得できませんでした：' + e.message); }
   }
 
@@ -77,6 +94,7 @@
     $('state-filter').addEventListener('change', () => list && renderList());
     $('search').addEventListener('input', () => list && renderList());
     $('d-subject-copy').addEventListener('click', e => copyText($('d-subject').textContent, e.currentTarget));
+    $('check-btn').addEventListener('click', async () => { try { $('check-btn').disabled = true; const r = await Api.hankyoCheckRequest(); renderCheck(r.check); } catch (e) { $('check-btn').disabled = false; $('check-status').textContent = '依頼できませんでした：' + e.message; $('check-status').className = 'save-message error'; } });
     $('d-copy').addEventListener('click', e => copyText($('d-reply').value, e.currentTarget));
     $('d-save').addEventListener('click', () => save({reply: $('d-reply').value}, '手直しを保存しました'));
     $('d-toggle').addEventListener('click', async () => { const next = current.state === '返信済' ? '未返信' : '返信済'; if (await save({state: next}, `「${next}」にしました`)) renderDetail({...current, state: next}); });

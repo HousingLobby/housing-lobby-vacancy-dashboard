@@ -85,6 +85,8 @@
     setManagement: body => request(null, {action: 'setManagement', ...body}),
     hankyoList: () => request({action: 'hankyoList'}),
     hankyoGet: id => request({action: 'hankyoGet', id}),
+    hankyoCheckRequest: () => request(null, {action: 'hankyoCheckRequest'}),
+    hankyoCheckStatus: () => request({action: 'hankyoCheckStatus'}),
     hankyoUpdate: body => request(null, {action: 'hankyoUpdate', ...body}),
     newId: () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`)
   };
