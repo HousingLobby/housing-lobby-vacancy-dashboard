@@ -1462,7 +1462,7 @@ function hankyoCounts_() { try { return JSON.parse(PropertiesService.getScriptPr
 // 件名は固定の型：【お客様名様】SUUMOからのお問い合わせ、誠にありがとうございます！：株式会社ハウジングロビー（名前の末尾の「様」は重ねない）
 function hankyoSubject_(name) {
   const n = String(name || '').replace(/様\s*$/, '').trim();
-  return '【' + (n || 'お客様') + '様】SUUMOからのお問い合わせ、誠にありがとうございます！：株式会社ハウジングロビー';
+  return '【' + (n ? n + '様' : 'お客様') + '】SUUMOからのお問い合わせ、誠にありがとうございます！：株式会社ハウジングロビー';
 }
 
 function hankyoClean_(v, max) { return String(v == null ? '' : v).slice(0, max || 500); }
