@@ -1427,7 +1427,7 @@ function marketDebug_(body) {
 // 書き込み（取り込み）は Mac 側の Claude が LP_WORKER_KEY で行う。画面（ログイン済みの社内ユーザー）は読み取りと状態・返信文の更新だけ。送信はしない。
 
 const HANKYO_KEEP_DAYS = 40;
-const HANKYO_HEAD = ['id', '受付日', '顧客名', 'メール', 'TEL', '店舗', '物件名', '号室', '問い合わせ内容', '現況', 'LP', '返信文', '状態', '登録', '更新'];
+const HANKYO_HEAD = ['id', '受付日', '顧客名', 'メール', 'TEL', '店舗', '物件名', '号室', '問い合わせ内容', '現況', 'LP', '返信文', '状態', '登録', '更新', '件名'];
 
 function hankyoSheet_() {
   const pr = PropertiesService.getScriptProperties();
@@ -1441,6 +1441,9 @@ function hankyoSheet_() {
   }
   const sh = ss.getSheetByName('反響') || ss.getSheets()[0];
   if (sh.getLastRow() === 0) { sh.getRange(1, 1, 1, HANKYO_HEAD.length).setValues([HANKYO_HEAD]); sh.setFrozenRows(1); sh.getRange(1, 1, sh.getMaxRows(), HANKYO_HEAD.length).setNumberFormat('@'); } // 全列を文字列に（電話番号の先頭0・日付の自動変換を防ぐ）
+  // 後から増えた列（件名）：既存のシートには見出しだけ足す
+  if (sh.getMaxColumns() < HANKYO_HEAD.length) sh.insertColumnsAfter(sh.getMaxColumns(), HANKYO_HEAD.length - sh.getMaxColumns());
+  if (!sh.getRange(1, HANKYO_HEAD.length).getValue()) { sh.getRange(1, HANKYO_HEAD.length).setNumberFormat('@').setValue(HANKYO_HEAD[HANKYO_HEAD.length - 1]); }
   return sh;
 }
 
@@ -1487,7 +1490,7 @@ function hankyoUpsert_(body) {
       if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(String(it.date || ''))) return;
       const vals = {id: id, '受付日': it.date, '顧客名': hankyoClean_(it.name, 80), 'メール': hankyoClean_(it.email, 120), 'TEL': hankyoClean_(it.tel, 40),
         '店舗': hankyoClean_(it.store, 10), '物件名': hankyoClean_(it.property, 120), '号室': hankyoClean_(it.room, 30), '問い合わせ内容': hankyoClean_(it.message, 2000),
-        '現況': hankyoClean_(it.status, 60), 'LP': hankyoClean_(it.lp, 300), '返信文': hankyoClean_(it.reply, 8000)};
+        '現況': hankyoClean_(it.status, 60), 'LP': hankyoClean_(it.lp, 300), '返信文': hankyoClean_(it.reply, 8000), '件名': hankyoClean_(it.subject, 200)};
       const cur = byId[id];
       if (cur) {
         const row = HANKYO_HEAD.map(h => h === '更新' ? now : h === '状態' || h === '登録' ? cur[h] : (vals[h] !== undefined && vals[h] !== '' ? vals[h] : cur[h]));
@@ -1523,7 +1526,7 @@ function hankyoGet_(id) {
   const d = new Date(String(r['受付日']) + 'T00:00:00+09:00');
   const expire = Utilities.formatDate(new Date(d.getTime() + HANKYO_KEEP_DAYS * 86400000), 'Asia/Tokyo', 'yyyy-MM-dd');
   return {id: r.id, date: r['受付日'], name: r['顧客名'], email: r['メール'], tel: r['TEL'], store: r['店舗'], property: r['物件名'], room: r['号室'],
-    message: r['問い合わせ内容'], status: r['現況'], lp: r['LP'], reply: r['返信文'], state: r['状態'], updated: r['更新'], expire: expire};
+    message: r['問い合わせ内容'], status: r['現況'], lp: r['LP'], subject: r['件名'], reply: r['返信文'], state: r['状態'], updated: r['更新'], expire: expire};
 }
 
 // 画面から：状態（未返信／返信済）と返信文の手直しだけ保存できる

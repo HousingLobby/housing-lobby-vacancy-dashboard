@@ -11,7 +11,7 @@
   <script defer src="config.js?v=20261008gas2"></script>
   <script defer src="auth.js?v=20261011e"></script>
   <script defer src="api.js?v=20261016"></script>
-  <script defer src="hankyo.js?v=20261016"></script>
+  <script defer src="hankyo.js?v=20261016b"></script>
 </head>
 <body>
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
@@ -36,6 +36,8 @@
           <section class="panel"><div class="panel-heading"><h2>お問い合わせ内容</h2></div><div class="hk-msg" id="d-msg"></div></section>
         </div>
         <section class="panel"><div class="panel-heading"><h2>返信文（下書き）</h2><span>直してからコピーして、メールソフトで送信</span></div>
+          <div class="panel-heading" style="margin-bottom:6px"><h3 style="margin:0;font-size:.9rem">件名</h3><button type="button" class="copy-mini" id="d-subject-copy">件名をコピー</button></div>
+          <div class="hk-msg" id="d-subject" style="margin-bottom:14px"></div>
           <textarea class="hk-reply" id="d-reply" aria-label="返信文"></textarea>
           <div class="button-row" style="margin-top:12px"><button type="button" class="primary-button" id="d-copy">返信文をコピー</button><button type="button" class="secondary-button" id="d-save">手直しを保存</button></div>
           <p class="save-message" id="d-message" role="status"></p>

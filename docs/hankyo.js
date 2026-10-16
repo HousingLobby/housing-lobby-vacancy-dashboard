@@ -47,6 +47,8 @@
     const row = (k, v, copy) => v ? `<dt>${k}</dt><dd>${esc(v)}${copy ? `<button type="button" class="copy-mini" data-copy="${esc(v)}">コピー</button>` : ''}</dd>` : '';
     $('d-dl').innerHTML = row('お問い合わせ物件', `${d.property} ${d.room}`.trim()) + row('現況', d.status) + (d.lp ? `<dt>LP</dt><dd><a href="${esc(d.lp)}" target="_blank" rel="noopener noreferrer">${esc(d.lp)}</a><button type="button" class="copy-mini" data-copy="${esc(d.lp)}">コピー</button></dd>` : '') + row('メール', d.email, true) + row('電話', d.tel, true);
     $('d-dl').querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyText(b.dataset.copy, b)));
+    $('d-subject').textContent = d.subject || '（件名の記録なし）';
+    $('d-subject-copy').hidden = !d.subject;
     $('d-msg').textContent = d.message || '（内容の記録なし）';
     $('d-reply').value = d.reply || '';
     $('d-message').textContent = '';
@@ -72,6 +74,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     $('state-filter').addEventListener('change', () => list && renderList());
     $('search').addEventListener('input', () => list && renderList());
+    $('d-subject-copy').addEventListener('click', e => copyText($('d-subject').textContent, e.currentTarget));
     $('d-copy').addEventListener('click', e => copyText($('d-reply').value, e.currentTarget));
     $('d-save').addEventListener('click', () => save({reply: $('d-reply').value}, '手直しを保存しました'));
     $('d-toggle').addEventListener('click', async () => { const next = current.state === '返信済' ? '未返信' : '返信済'; if (await save({state: next}, `「${next}」にしました`)) renderDetail({...current, state: next}); });
