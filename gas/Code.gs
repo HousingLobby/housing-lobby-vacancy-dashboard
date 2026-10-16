@@ -1459,6 +1459,12 @@ function hankyoRows_(sh) {
 
 function hankyoCounts_() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('HANKYO_COUNTS') || '{}'); } catch (_) { return {}; } }
 
+// 件名は固定の型：【お客様名様】SUUMOからのお問い合わせ、誠にありがとうございます！：株式会社ハウジングロビー（名前の末尾の「様」は重ねない）
+function hankyoSubject_(name) {
+  const n = String(name || '').replace(/様\s*$/, '').trim();
+  return '【' + (n || 'お客様') + '様】SUUMOからのお問い合わせ、誠にありがとうございます！：株式会社ハウジングロビー';
+}
+
 function hankyoClean_(v, max) { return String(v == null ? '' : v).slice(0, max || 500); }
 
 // 受付日から40日たった行を削除（件数は残る）
@@ -1490,7 +1496,7 @@ function hankyoUpsert_(body) {
       if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(String(it.date || ''))) return;
       const vals = {id: id, '受付日': it.date, '顧客名': hankyoClean_(it.name, 80), 'メール': hankyoClean_(it.email, 120), 'TEL': hankyoClean_(it.tel, 40),
         '店舗': hankyoClean_(it.store, 10), '物件名': hankyoClean_(it.property, 120), '号室': hankyoClean_(it.room, 30), '問い合わせ内容': hankyoClean_(it.message, 2000),
-        '現況': hankyoClean_(it.status, 60), 'LP': hankyoClean_(it.lp, 300), '返信文': hankyoClean_(it.reply, 8000), '件名': hankyoClean_(it.subject, 200)};
+        '現況': hankyoClean_(it.status, 60), 'LP': hankyoClean_(it.lp, 300), '返信文': hankyoClean_(it.reply, 8000), '件名': hankyoClean_(it.subject, 200) || hankyoSubject_(it.name)};
       const cur = byId[id];
       if (cur) {
         const row = HANKYO_HEAD.map(h => h === '更新' ? now : h === '状態' || h === '登録' ? cur[h] : (vals[h] !== undefined && vals[h] !== '' ? vals[h] : cur[h]));
@@ -1526,7 +1532,7 @@ function hankyoGet_(id) {
   const d = new Date(String(r['受付日']) + 'T00:00:00+09:00');
   const expire = Utilities.formatDate(new Date(d.getTime() + HANKYO_KEEP_DAYS * 86400000), 'Asia/Tokyo', 'yyyy-MM-dd');
   return {id: r.id, date: r['受付日'], name: r['顧客名'], email: r['メール'], tel: r['TEL'], store: r['店舗'], property: r['物件名'], room: r['号室'],
-    message: r['問い合わせ内容'], status: r['現況'], lp: r['LP'], subject: r['件名'], reply: r['返信文'], state: r['状態'], updated: r['更新'], expire: expire};
+    message: r['問い合わせ内容'], status: r['現況'], lp: r['LP'], subject: r['件名'] || hankyoSubject_(r['顧客名']), reply: r['返信文'], state: r['状態'], updated: r['更新'], expire: expire};
 }
 
 // 画面から：状態（未返信／返信済）と返信文の手直しだけ保存できる
