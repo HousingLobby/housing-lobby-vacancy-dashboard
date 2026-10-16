@@ -67,8 +67,10 @@
   }
 
   async function save(patch, msg) {
-    try { await Api.hankyoUpdate({id: current.id, ...patch}); Object.assign(current, patch.reply !== undefined ? {reply: patch.reply} : {}, patch.state ? {state: patch.state} : {}); $('d-message').textContent = msg; $('d-message').className = 'save-message'; list = null; return true; }
-    catch (e) { $('d-message').textContent = '保存できませんでした：' + e.message; $('d-message').className = 'save-message error'; return false; }
+    const say = (t, err) => { for (const id of ['d-message', 'd-top-message']) { $(id).textContent = t; $(id).className = 'save-message' + (err ? ' error' : ''); } };
+    say('保存しています…');
+    try { await Api.hankyoUpdate({id: current.id, ...patch}); Object.assign(current, patch.reply !== undefined ? {reply: patch.reply} : {}, patch.state ? {state: patch.state} : {}); say(msg); list = null; return true; }
+    catch (e) { say('保存できませんでした：' + e.message, true); return false; }
   }
 
   document.addEventListener('DOMContentLoaded', () => {

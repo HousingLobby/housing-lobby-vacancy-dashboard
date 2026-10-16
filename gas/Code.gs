@@ -1499,11 +1499,12 @@ function hankyoUpsert_(body) {
         '現況': hankyoClean_(it.status, 60), 'LP': hankyoClean_(it.lp, 300), '返信文': hankyoClean_(it.reply, 8000), '件名': hankyoClean_(it.subject, 200) || hankyoSubject_(it.name)};
       const cur = byId[id];
       if (cur) {
-        const row = HANKYO_HEAD.map(h => h === '更新' ? now : h === '状態' || h === '登録' ? cur[h] : (vals[h] !== undefined && vals[h] !== '' ? vals[h] : cur[h]));
+        const newState = ['未返信', '返信済'].indexOf(it.state) >= 0 ? it.state : cur['状態'];
+        const row = HANKYO_HEAD.map(h => h === '更新' ? now : h === '状態' ? newState : h === '登録' ? cur[h] : (vals[h] !== undefined && vals[h] !== '' ? vals[h] : cur[h]));
         sh.getRange(cur.row, 1, 1, HANKYO_HEAD.length).setValues([row]);
         updated++;
       } else {
-        sh.appendRow(HANKYO_HEAD.map(h => h === '状態' ? '未返信' : h === '登録' || h === '更新' ? now : vals[h]));
+        sh.appendRow(HANKYO_HEAD.map(h => h === '状態' ? (it.state === '返信済' ? '返信済' : '未返信') : h === '登録' || h === '更新' ? now : vals[h]));
         const ym = String(it.date).slice(0, 7), c = counts[ym] || {t: 0, A: 0, B: 0};
         c.t++; if (c[vals['店舗']] !== undefined) c[vals['店舗']]++;
         counts[ym] = c;
