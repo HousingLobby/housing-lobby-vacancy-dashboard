@@ -17,7 +17,8 @@
   <script defer src="outbox.js?v=20261008auth"></script>
   <script defer src="outbox-bar.js?v=20261008auth"></script>
   <script defer src="app.js?v=20261008gas4"></script>
-  <script defer src="promotion.js?v=20261008auth"></script>
+  <script defer src="promotion.js?v=20261016"></script>
+  <script defer src="promotion-report.js?v=20261016"></script>
 </head>
 <body>
   <header class="masthead">
@@ -80,7 +81,8 @@
 
     <section class="view" id="view-promotion" aria-labelledby="promotion-title" hidden>
       <div class="section-heading"><div><p class="eyebrow">LEASING PROMOTION</p><h1 id="promotion-title">入居促進</h1></div><p class="section-meta" id="promo-asof"></p></div>
-      <div class="filters"><label>対象月<select id="promo-month"></select></label><label>&nbsp;<button type="button" class="secondary-button" id="promo-refresh">最新に更新</button></label></div>
+      <div class="filters"><label>対象月<select id="promo-month"></select></label><label>&nbsp;<button type="button" class="secondary-button" id="promo-refresh">最新に更新</button></label><label>&nbsp;<button type="button" class="primary-button" id="promo-report">月次レポートを作成</button></label><label>&nbsp;<button type="button" class="secondary-button" id="promo-csv">CSVでダウンロード</button></label></div>
+      <p class="footnote" id="promo-export-msg" role="status" style="margin:-8px 0 12px"></p>
       <div class="notice subtle" id="promo-notice">月を選ぶと、Asanaから申込と反響を集計します（数十秒かかることがあります）。</div>
       <div class="kpis" id="promo-kpis"></div>
       <div class="dashboard-grid promo-grid">

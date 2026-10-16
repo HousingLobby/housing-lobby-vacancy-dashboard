@@ -65,6 +65,7 @@
     const hit = new Set(Object.keys(r.byProperty || {}));
     const zero = dash.data.vacancies.filter(v => v.s === '空室中' && v.p && !hit.has(key(v.p)))
       .sort((x, y) => (dash.vacancyDays(y) ?? -1e9) - (dash.vacancyDays(x) ?? -1e9));
+    window.PROMO_CURRENT = {month, d, zero: zero.map(v => ({name: `${v.p} ${v.r || ''}`.trim(), days: dash.vacancyDays(v), area: v.a || '', kind: v.c || ''}))};
     el('promo-zero-count').textContent = `${fmt(zero.length)}件`;
     el('promo-zero').innerHTML = zero.length ? zero.slice(0, 50).map(v => {
       const days = dash.vacancyDays(v);
