@@ -11,7 +11,7 @@
   <script defer src="config.js?v=20261008gas2"></script>
   <script defer src="auth.js?v=20261011e"></script>
   <script defer src="api.js?v=20261017a"></script>
-  <script defer src="hankyo.js?v=20261017b"></script>
+  <script defer src="hankyo.js?v=20261017c"></script>
 </head>
 <body>
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
@@ -35,6 +35,7 @@
       </div>
       <div class="panel hk-bm">
         <div class="panel-heading"><h2>自分のPCから取り込む（ブックマーク）</h2><span>Windows・Macどちらでも／Edge・Chrome</span></div>
+        <p style="margin:0 0 8px"><a class="secondary-button" style="display:inline-block;text-decoration:none" href="jds-guide.html" target="_blank" rel="noopener">▶ イラストで手順を見る（PDF保存もできます）</a></p>
         <p style="margin:0 0 8px;font-size:.9rem">① 下のボタンを、ブラウザの<b>ブックマークバーにドラッグ</b>して登録します（最初の1回だけ）。<br>② <b>JDSにログイン</b>した状態で、JDSのページを開いたまま、そのブックマークを押します。<br>③ 新しいタブが開き、新しい反響だけがダッシュボードに登録されます（数秒）。</p>
         <a class="primary-button" id="bookmarklet" style="display:inline-block;text-decoration:none" href="javascript:(function(){var s=document.createElement('script');s.src='https://housinglobby.github.io/housing-lobby-vacancy-dashboard/jds-import.js?t='+Date.now();document.body.appendChild(s)})();">JDS反響を取り込む</a>
         <span class="footnote" style="margin-left:8px">← ドラッグして登録（ここでは押さないでください）</span>

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JDS反響の取り込み 手順（図解）</title>
+<style>
+@page{size:A4;margin:0}
+*{box-sizing:border-box}
+:root{--fg:#13262d;--mu:#4b6068;--line:#c9d9de;--teal:#0e6f73;--ts:#dff1f1;--am:#b86d05;--as:#fcecd3;--ro:#b3412f;--rs:#f9e1dc;--bl:#1b5d85;--bs:#e3eef6;--gr:#14704b;--gs:#e4f5ec}
+html,body{margin:0;padding:0;background:#eef2f4}
+body{font-family:'Hiragino Sans','Hiragino Kaku Gothic ProN','Yu Gothic','Meiryo',sans-serif;color:var(--fg);font-size:10.5pt;line-height:1.55}
+.page{width:210mm;min-height:297mm;margin:0 auto 6mm;background:#fff;padding:11mm 12mm 9mm;display:flex;flex-direction:column;gap:4.4mm;page-break-after:always;overflow:hidden}
+.page:last-child{page-break-after:auto}
+@media print{html,body{background:#fff}.page{margin:0;height:296mm;min-height:0}.noprint{display:none!important}}
+@media(max-width:800px){.page{width:100%;min-height:0}}
+.ph{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:1.8mm solid var(--teal);padding-bottom:2.4mm}
+.ph small{font-size:8.6pt;color:var(--teal);font-weight:700;letter-spacing:.1em}
+.ph h1{margin:.5mm 0 0;font-size:21pt;line-height:1.2}
+.ph p{margin:0;font-size:9.4pt;color:var(--mu);text-align:right;max-width:70mm}
+.step{display:grid;grid-template-columns:13mm 1fr;gap:3.4mm;align-items:start}
+.num{width:13mm;height:13mm;border-radius:50%;background:var(--teal);color:#fff;font-weight:800;font-size:17pt;display:flex;align-items:center;justify-content:center}
+.step h2{margin:0 0 .6mm;font-size:13pt;line-height:1.3}
+.step p{margin:0 0 2mm;color:var(--mu);font-size:9.8pt}
+.step svg{width:100%;height:auto;display:block;border:.3mm solid var(--line);border-radius:3mm;background:#fff}
+.tip{border-left:1.2mm solid var(--am);background:var(--as);border-radius:0 2.5mm 2.5mm 0;padding:1.8mm 3mm;font-size:9.2pt;line-height:1.45;margin-top:1.6mm}
+.tip b{color:var(--am)}
+.ok{border-left:1.2mm solid var(--gr);background:var(--gs);border-radius:0 2.5mm 2.5mm 0;padding:1.8mm 3mm;font-size:9.2pt;line-height:1.45;margin-top:1.6mm}
+.ok b{color:var(--gr)}
+.badge{display:inline-block;font-size:8pt;font-weight:700;padding:0 2.2mm;border-radius:5mm;color:#fff;margin-right:1mm}
+.b1{background:var(--bl)}.b2{background:var(--teal)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:3mm}
+.card{border:.35mm solid var(--line);border-radius:3mm;padding:2.6mm 3.2mm}
+.card h3{margin:0 0 .8mm;font-size:10.4pt}
+.card p{margin:0;font-size:9pt;color:var(--mu);line-height:1.45}
+.r{border-color:var(--ro);background:var(--rs)}
+.tools{max-width:210mm;margin:3mm auto;display:flex;gap:3mm;padding:0 3mm}
+.tools button{font-size:11pt;padding:2mm 6mm;border-radius:2mm;border:0;background:#1b5d85;color:#fff;font-weight:700;cursor:pointer}
+footer{margin-top:auto;font-size:7.8pt;color:var(--mu);display:flex;justify-content:space-between}
+</style></head><body>
+<div class="tools noprint"><button onclick="window.print()">PDFで保存・印刷</button><a href="hankyo.html" style="align-self:center">← 反響対応のページに戻る</a></div>
+
+<!-- ======== 1ページ目：最初の1回 ======== -->
+<div class="page">
+  <div class="ph"><div><small>株式会社ハウジングロビー　社内向け</small><h1>JDS反響の取り込み手順</h1></div><p>ブックマークを1つ登録すれば、あとはボタンを押すだけ。</p></div>
+
+  <div class="card" style="background:var(--ts);border-color:var(--teal)">
+    <h3>全体の流れ</h3>
+    <svg viewBox="0 0 700 64" style="width:100%;height:auto">
+      <defs><marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#13262d"/></marker></defs>
+      <g font-size="12.5" font-weight="700" fill="#13262d" text-anchor="middle">
+        <rect x="2" y="8" width="150" height="48" rx="10" fill="#fff" stroke="#0e6f73" stroke-width="2"/><text x="77" y="30">① 最初の1回だけ</text><text x="77" y="47" font-size="10" font-weight="400" fill="#4b6068">ブックマークを登録</text>
+        <rect x="190" y="8" width="150" height="48" rx="10" fill="#fff" stroke="#1b5d85" stroke-width="2"/><text x="265" y="30">② JDSにログイン</text><text x="265" y="47" font-size="10" font-weight="400" fill="#4b6068">いつもどおり</text>
+        <rect x="378" y="8" width="150" height="48" rx="10" fill="#fff" stroke="#b86d05" stroke-width="2"/><text x="453" y="30">③ ブックマークを押す</text><text x="453" y="47" font-size="10" font-weight="400" fill="#4b6068">JDSのページで</text>
+        <rect x="566" y="8" width="132" height="48" rx="10" fill="#e4f5ec" stroke="#14704b" stroke-width="2"/><text x="632" y="30">④ 取り込み完了</text><text x="632" y="47" font-size="10" font-weight="400" fill="#4b6068">数秒でOK</text>
+      </g>
+      <g stroke="#13262d" stroke-width="1.8" fill="none"><path d="M154 32H186" marker-end="url(#m)"/><path d="M342 32H374" marker-end="url(#m)"/><path d="M530 32H562" marker-end="url(#m)"/></g>
+    </svg>
+  </div>
+
+  <h2 style="margin:0;font-size:12pt;color:var(--teal)">▼ 最初の1回だけ行う準備（約1分）</h2>
+
+  <div class="step"><div class="num">1</div><div>
+    <h2>ブックマークバーを表示する</h2>
+    <p>ブラウザの上に、ブックマークを並べる細い帯を出します。<b>Windows：Ctrl + Shift + B</b>　／　Mac：Command + Shift + B　（もう一度押すと消えます）</p>
+    <svg viewBox="0 0 640 170">
+      <rect x="6" y="6" width="628" height="158" rx="12" fill="#f3f6f8" stroke="#9bb1b8" stroke-width="2"/>
+      <circle cx="26" cy="24" r="5" fill="#e0867a"/><circle cx="44" cy="24" r="5" fill="#e8c36a"/><circle cx="62" cy="24" r="5" fill="#7cc79b"/>
+      <rect x="84" y="12" width="150" height="24" rx="8" fill="#fff" stroke="#c9d9de"/><text x="96" y="29" font-size="11" fill="#13262d">ダッシュボード</text>
+      <rect x="14" y="44" width="612" height="28" rx="14" fill="#fff" stroke="#c9d9de"/><text x="34" y="63" font-size="11" fill="#4b6068">housinglobby.github.io/…/hankyo.html</text>
+      <rect x="14" y="80" width="612" height="26" rx="4" fill="#fcecd3" stroke="#b86d05" stroke-width="2" stroke-dasharray="5 4"/><text x="24" y="98" font-size="11" fill="#b86d05" font-weight="700">← この細い帯（ブックマークバー）が出ればOK</text>
+      <rect x="14" y="116" width="612" height="40" rx="6" fill="#fff"/>
+      <text x="320" y="142" font-size="12" text-anchor="middle" fill="#9bb1b8">ページの内容</text>
+      <g transform="translate(520,10)"><rect width="110" height="30" rx="8" fill="#13262d"/><text x="55" y="20" font-size="12" fill="#fff" text-anchor="middle" font-weight="700">Ctrl+Shift+B</text></g>
+    </svg>
+  </div></div>
+
+  <div class="step"><div class="num">2</div><div>
+    <h2>「JDS反響を取り込む」ボタンを、バーにドラッグする</h2>
+    <p>ダッシュボードの「反響対応」ページにある<b>青いボタン</b>を、マウスで押したまま、ブックマークバーまで引っぱって離します。（ここでは押さずに「ドラッグ」だけ）</p>
+    <svg viewBox="0 0 640 215">
+      <rect x="6" y="6" width="628" height="203" rx="12" fill="#f3f6f8" stroke="#9bb1b8" stroke-width="2"/>
+      <rect x="14" y="14" width="612" height="26" rx="13" fill="#fff" stroke="#c9d9de"/><text x="34" y="32" font-size="11" fill="#4b6068">housinglobby.github.io/…/hankyo.html</text>
+      <rect x="14" y="46" width="612" height="26" rx="4" fill="#fcecd3" stroke="#b86d05" stroke-width="2"/><text x="24" y="64" font-size="11" fill="#b86d05" font-weight="700">ブックマークバー ← ここに置く</text>
+      <rect x="14" y="80" width="612" height="122" rx="8" fill="#fff"/>
+      <text x="30" y="104" font-size="13" font-weight="700" fill="#13262d">自分のPCから取り込む（ブックマーク）</text>
+      <rect x="30" y="120" width="160" height="34" rx="9" fill="#1b5d85"/><text x="110" y="142" font-size="13" fill="#fff" text-anchor="middle" font-weight="700">JDS反響を取り込む</text>
+      <path d="M124 118C150 90 260 84 330 62" stroke="#b86d05" stroke-width="3.2" fill="none" stroke-dasharray="7 5"/><path d="M330 62l-12 1 6 9z" fill="#b86d05"/>
+      <g transform="translate(300,48)"><rect width="150" height="22" rx="6" fill="#1b5d85"/><text x="75" y="15" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">JDS反響を取り込む</text></g>
+      <text x="30" y="182" font-size="11" fill="#4b6068">① ボタンの上でマウスを押したまま　② バーまで動かして　③ 離す</text>
+    </svg>
+    <div class="ok"><b>できたか確認：</b>ブックマークバーに「JDS反響を取り込む」が並べば登録完了です。（この準備は、PCごとに1回だけです）</div>
+    <div class="tip"><b>うまくドラッグできないとき：</b>ボタンの上で<b>右クリック</b>→「ブックマークに追加」（Edgeは「お気に入りに追加」）でも登録できます。ブラウザは<b>Edge または Chrome</b>を使ってください。</div>
+  </div></div>
+  <footer><span>空室業務ダッシュボード　JDS反響の取り込み手順</span><span>1 / 2</span></footer>
+</div>
+
+<!-- ======== 2ページ目：毎回の使い方 ======== -->
+<div class="page">
+  <div class="ph"><div><small>毎回の使い方</small><h1>JDSで、ブックマークを押すだけ</h1></div><p>取り込みは数秒。新しい反響だけが登録されます。</p></div>
+
+  <div class="step"><div class="num">3</div><div>
+    <h2>JDSにログインして、JDSのページを開く</h2>
+    <p>いつものとおり、JDSにログインします。<b>長崎店</b>の反響は長崎店で、<b>県央店（諫早）</b>の反響は県央店で、ログインしてください。</p>
+    <svg viewBox="0 0 640 150">
+      <rect x="6" y="6" width="628" height="138" rx="12" fill="#f3f6f8" stroke="#9bb1b8" stroke-width="2"/>
+      <rect x="14" y="14" width="612" height="26" rx="13" fill="#fff" stroke="#c9d9de"/><text x="34" y="32" font-size="11" fill="#4b6068">jds.suumo.jp</text>
+      <rect x="14" y="46" width="612" height="26" rx="4" fill="#fcecd3" stroke="#b86d05"/><g transform="translate(20,49)"><rect width="150" height="20" rx="6" fill="#1b5d85"/><text x="75" y="14" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">JDS反響を取り込む</text></g>
+      <rect x="14" y="80" width="612" height="56" rx="8" fill="#fff"/>
+      <text x="30" y="104" font-size="13" font-weight="700" fill="#13262d">JDS 住宅情報ダウンロードシステム</text><text x="30" y="124" font-size="11" fill="#4b6068">ハウジングロビーL&amp;P長崎店　／　ログインユーザー：○○</text>
+      <rect x="470" y="94" width="140" height="30" rx="8" fill="#e4f5ec" stroke="#14704b" stroke-width="2"/><text x="540" y="114" font-size="11" fill="#14704b" text-anchor="middle" font-weight="700">ログイン中ならOK</text>
+    </svg>
+  </div></div>
+
+  <div class="step"><div class="num">4</div><div>
+    <h2>ブックマーク「JDS反響を取り込む」を押す</h2>
+    <p>JDSのページを開いたまま、ブックマークバーの<b>「JDS反響を取り込む」</b>を1回クリックします。</p>
+    <svg viewBox="0 0 640 150">
+      <rect x="6" y="6" width="628" height="138" rx="12" fill="#f3f6f8" stroke="#9bb1b8" stroke-width="2"/>
+      <rect x="14" y="14" width="612" height="26" rx="13" fill="#fff" stroke="#c9d9de"/><text x="34" y="32" font-size="11" fill="#4b6068">jds.suumo.jp</text>
+      <rect x="14" y="46" width="612" height="26" rx="4" fill="#fcecd3" stroke="#b86d05"/><g transform="translate(20,49)"><rect width="150" height="20" rx="6" fill="#1b5d85" stroke="#b86d05" stroke-width="3"/><text x="75" y="14" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">JDS反響を取り込む</text></g>
+      <path d="M118 72 L118 100" stroke="#b86d05" stroke-width="3.4"/><path d="M118 100l-7-9h14z" transform="rotate(180 118 96)" fill="#b86d05"/>
+      <path d="M96 60 l14 22 6-10 10 4z" fill="#13262d" stroke="#fff" stroke-width="1.5" transform="translate(40 -8)"/>
+      <rect x="14" y="80" width="612" height="56" rx="8" fill="#fff"/><text x="200" y="112" font-size="14" font-weight="700" fill="#b86d05">← ここを1回クリック（新しいタブが開きます）</text>
+    </svg>
+    <div class="tip"><b>新しいタブがブロックされたとき：</b>アドレスバーの右に「ポップアップがブロックされました」と出たら、「常に許可」を選んで、もう一度押してください。（最初の1回だけ）</div>
+  </div></div>
+
+  <div class="step"><div class="num">5</div><div>
+    <h2>新しいタブで、結果を確認する</h2>
+    <p>ダッシュボードのタブが自動で開き、数秒で取り込みが終わります。<b>「新規○件を取り込みました」</b>と出れば完了です。</p>
+    <svg viewBox="0 0 640 150">
+      <rect x="6" y="6" width="628" height="138" rx="12" fill="#f3f6f8" stroke="#9bb1b8" stroke-width="2"/>
+      <rect x="14" y="14" width="612" height="26" rx="13" fill="#fff" stroke="#c9d9de"/><text x="34" y="32" font-size="11" fill="#4b6068">housinglobby.github.io/…/hankyo.html#import</text>
+      <rect x="14" y="48" width="612" height="88" rx="8" fill="#fff"/>
+      <text x="30" y="72" font-size="14" font-weight="700" fill="#13262d">JDSから反響を取り込み</text>
+      <rect x="30" y="82" width="580" height="26" rx="6" fill="#e4f5ec" stroke="#14704b"/><text x="42" y="100" font-size="12" fill="#14704b" font-weight="700">長崎店：JDSの22件のうち、新規3件を取り込みました</text>
+      <rect x="30" y="114" width="170" height="20" rx="6" fill="#1b5d85"/><text x="115" y="128" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">反響対応の一覧を見る</text>
+    </svg>
+    <div class="ok"><b>取り込まれる内容：</b>お客様名・連絡先・物件・問い合わせ内容。すでに登録済みの反響は、そのままです（二重にはなりません）。</div>
+  </div></div>
+
+  <div class="grid">
+    <div class="card r"><h3>うまくいかないとき</h3><p><b>「ログインしていないようです」</b>→ JDSにログインしてから押す<br><b>「JDSのページを開いてください」</b>→ JDSのタブで押す（ダッシュボードのタブでは動きません）<br><b>何も起きない</b>→ ポップアップを許可（手順4）</p></div>
+    <div class="card"><h3>知っておくこと</h3><p>・ログイン中の店舗の反響だけが対象です<br>・メールの送信、Asana、JDSへの書き込みはしません<br>・お客様の情報は受付日から40日で自動削除されます<br>・JDSの画面が変わって動かなくなったら、画面の表示を担当者に伝えてください</p></div>
+  </div>
+  <footer><span>空室業務ダッシュボード　JDS反響の取り込み手順</span><span>2 / 2</span></footer>
+</div>
+</body></html>
