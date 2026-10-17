@@ -10,13 +10,19 @@
   <script defer src="vendor/msal-browser-2.38.3.min.js"></script>
   <script defer src="config.js?v=20261008gas2"></script>
   <script defer src="auth.js?v=20261011e"></script>
-  <script defer src="api.js?v=20261016b"></script>
-  <script defer src="hankyo.js?v=20261016f"></script>
+  <script defer src="api.js?v=20261017a"></script>
+  <script defer src="hankyo.js?v=20261017a"></script>
 </head>
 <body>
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
   <main class="shell room-shell">
     <a class="back-link" id="back-link" href="index.html">← ダッシュボードに戻る</a>
+    <section id="import-view" hidden>
+      <div class="section-heading"><div><p class="eyebrow">JDS IMPORT</p><h1>JDSから反響を取り込み</h1></div></div>
+      <div class="panel"><p id="import-status" class="save-message" role="status" style="font-size:1rem">JDSから読み取り中です…</p>
+        <div class="button-row" style="margin-top:12px"><button type="button" class="primary-button" id="import-done" hidden>反響対応の一覧を見る</button></div>
+        <p class="footnote" style="margin-top:10px">このタブは、JDSの画面のブックマークから自動で開きました。読み取った内容は、ログイン中のあなたのアカウントでダッシュボードに登録されます。</p></div>
+    </section>
     <section id="list-view">
       <div class="section-heading"><div><p class="eyebrow">INQUIRIES</p><h1>反響対応</h1></div><p class="section-meta" id="keep-note"></p></div>
       <div class="hk-counts" id="counts"></div>
@@ -26,6 +32,13 @@
         <div class="hk-last" id="check-last"></div>
         <div class="button-row"><button type="button" class="primary-button" id="check-btn">反響データ確認</button><span class="save-message" id="check-status" role="status"></span></div>
         <p class="footnote" style="margin:8px 0 0">ボタンを押すと依頼が入ります。取り込みは、Macで担当者が実行したときに行われます（Claudeアプリの「Scheduled」→「反響データ確認」→「今すぐ実行」、または「反響データ確認をして」と依頼）。取り込んだ反響の返信文は、「スーモ」の対応で作成します。</p>
+      </div>
+      <div class="panel hk-bm">
+        <div class="panel-heading"><h2>自分のPCから取り込む（ブックマーク）</h2><span>Windows・Macどちらでも／Edge・Chrome</span></div>
+        <p style="margin:0 0 8px;font-size:.9rem">① 下のボタンを、ブラウザの<b>ブックマークバーにドラッグ</b>して登録します（最初の1回だけ）。<br>② <b>JDSにログイン</b>した状態で、JDSのページを開いたまま、そのブックマークを押します。<br>③ 新しいタブが開き、新しい反響だけがダッシュボードに登録されます（数秒）。</p>
+        <a class="primary-button" id="bookmarklet" style="display:inline-block;text-decoration:none" href="javascript:(function(){var s=document.createElement('script');s.src='https://housinglobby.github.io/housing-lobby-vacancy-dashboard/jds-import.js?t='+Date.now();document.body.appendChild(s)})();">JDS反響を取り込む</a>
+        <span class="footnote" style="margin-left:8px">← ドラッグして登録（ここでは押さないでください）</span>
+        <p class="footnote" style="margin:8px 0 0">ログインしている店舗（長崎店／県央店）の反響だけが対象です。メールの送信・Asana・JDSへの書き込みはしません。</p>
       </div>
       <div class="panel">
         <div class="panel-heading"><h2>お客様一覧</h2><span id="list-count"></span></div>

@@ -76,8 +76,35 @@
     $('d-expire').textContent = `この記録は ${d.expire} に自動削除されます（受付日から${list ? list.keepDays : 40}日）。`;
   }
 
+  // 各PCのブラウザでJDSを読み取った結果を受け取り、登録する（JDSのページのブックマークから開かれる）
+  let importing = false;
+  async function runImport() {
+    if (importing) return; importing = true;
+    $('list-view').hidden = true; $('detail-view').hidden = true; $('import-view').hidden = false;
+    const st = $('import-status'), say = (t, err) => { st.textContent = t; st.className = 'save-message' + (err ? ' error' : ''); };
+    $('back-link').textContent = '← 反響対応の一覧に戻る'; $('back-link').href = '#';
+    if (!window.opener) { say('JDSの画面のブックマークから開いてください（このタブを直接開いても取り込めません）', true); importing = false; return; }
+    const got = new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('JDSから応答がありません。JDSのタブでもう一度ブックマークを押してください')), 90000);
+      window.addEventListener('message', e => { if (e.origin === 'https://jds.suumo.jp' && e.data && (e.data.type === 'hankyo-items' || e.data.type === 'hankyo-error')) { clearTimeout(t); resolve(e.data); } });
+    });
+    try { window.opener.postMessage({type: 'hankyo-ready'}, 'https://jds.suumo.jp'); } catch (e) {}
+    try {
+      const msg = await got;
+      if (msg.type === 'hankyo-error') throw new Error(msg.message);
+      say(`JDSから${msg.items.length}件を読み取りました。登録しています…`);
+      const r = await Api.hankyoImport({items: msg.items, store: msg.store});
+      const store = {A: '県央店（諫早）', B: '長崎店'}[msg.store] || '';
+      say(`${store}：新規${r.added}件を取り込みました（すでにある${msg.items.length - r.added - (r.skipped || 0)}件はそのまま${r.skipped ? `、読み取れなかった${r.skipped}件は除外` : ''}）。`);
+      $('import-done').hidden = false; list = null;
+    } catch (e) { say('取り込めませんでした：' + e.message, true); }
+    importing = false;
+  }
+
   async function route() {
     const id = decodeURIComponent(location.hash.slice(1));
+    if (id === 'import') { runImport(); return; }
+    $('import-view').hidden = true;
     $('list-view').hidden = Boolean(id); $('detail-view').hidden = !id;
     $('back-link').textContent = id ? '← 反響対応の一覧に戻る' : '← ダッシュボードに戻る';
     $('back-link').href = id ? '#' : 'index.html';
@@ -99,6 +126,7 @@
     $('search').addEventListener('input', () => list && renderList());
     $('d-subject-copy').addEventListener('click', e => copyText($('d-subject').textContent, e.currentTarget));
     $('check-btn').addEventListener('click', async () => { try { $('check-btn').disabled = true; const r = await Api.hankyoCheckRequest(); renderCheck(r.check); } catch (e) { $('check-btn').disabled = false; $('check-status').textContent = '依頼できませんでした：' + e.message; $('check-status').className = 'save-message error'; } });
+    $('import-done').addEventListener('click', () => { location.hash = ''; });
     $('d-copy').addEventListener('click', e => copyText($('d-reply').value, e.currentTarget));
     $('d-save').addEventListener('click', () => save({reply: $('d-reply').value}, '手直しを保存しました'));
     $('d-toggle').addEventListener('click', async () => { const next = current.state === '返信済' ? '未返信' : '返信済'; if (await save({state: next}, `「${next}」にしました`)) renderDetail({...current, state: next}); });

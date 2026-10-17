@@ -151,6 +151,7 @@ function handle_(action, body) {
     case 'lpUpdate': return lpUpdate_(body);
     case 'hankyoUpsert': return hankyoUpsert_(body);
     // 反響対応（ログイン必須）
+    case 'hankyoImport': return hankyoImport_(body);
     case 'hankyoCheckRequest': return hankyoCheckRequest_();
     case 'hankyoCheckStatus': return {check: hankyoCheckGet__()};
     case 'hankyoCheckGet': return hankyoCheckWorkerGet_(body.key);
@@ -1487,7 +1488,22 @@ function hankyoPurge_() {
 // Claude が呼ぶ：items=[{id,date,name,email,tel,store,property,room,message,status,lp,reply}]。idが既にあれば更新、なければ追加（件数は追加時に1回だけ数える）
 function hankyoUpsert_(body) {
   lpWorkerOk_(body.key);
-  const items = Array.isArray(body.items) ? body.items.slice(0, 50) : [];
+  return hankyoUpsertCore_(Array.isArray(body.items) ? body.items.slice(0, 50) : [], false);
+}
+
+// 画面から（ログイン済みの社内ユーザー）：各PCのブラウザでJDSを読み取った反響を取り込む。既にあるidは触らない（追加のみ）
+function hankyoImport_(body) {
+  const items = Array.isArray(body.items) ? body.items.slice(0, 200) : [];
+  const store = ['A', 'B'].indexOf(body.store) >= 0 ? body.store : '';
+  const ok = items.filter(it => it && /^[AB]-\d{6,}$/.test(String(it.id || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(it.date || '')))
+    .map(it => ({id: it.id, date: it.date, name: it.name ? (/様\s*$/.test(it.name) ? it.name : it.name + '様') : '', email: it.email, tel: it.tel, store: it.id.charAt(0),
+      property: it.property, room: '', message: it.message, state: /済/.test(String(it.comment || '')) ? '返信済' : '未返信'}));
+  const r = hankyoUpsertCore_(ok, true);
+  if (store) { const l = hankyoLastGet__(); l[store] = new Date().toISOString(); PropertiesService.getScriptProperties().setProperty('HANKYO_LAST', JSON.stringify(l)); }
+  return {ok: true, added: r.added, skipped: items.length - ok.length + (ok.length - r.added - r.updated), read: items.length};
+}
+
+function hankyoUpsertCore_(items, addOnly) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -1505,6 +1521,7 @@ function hankyoUpsert_(body) {
         '店舗': hankyoClean_(it.store, 10), '物件名': hankyoClean_(it.property, 120), '号室': hankyoClean_(it.room, 30), '問い合わせ内容': hankyoClean_(it.message, 2000),
         '現況': hankyoClean_(it.status, 60), 'LP': hankyoClean_(it.lp, 300), '返信文': hankyoClean_(it.reply, 8000), '件名': hankyoClean_(it.subject, 200) || hankyoSubject_(it.name)};
       const cur = byId[id];
+      if (cur && addOnly) return;
       if (cur) {
         const newState = ['未返信', '返信済'].indexOf(it.state) >= 0 ? it.state : cur['状態'];
         const row = HANKYO_HEAD.map(h => h === '更新' ? now : h === '状態' ? newState : h === '登録' ? cur[h] : (vals[h] !== undefined && vals[h] !== '' ? vals[h] : cur[h]));

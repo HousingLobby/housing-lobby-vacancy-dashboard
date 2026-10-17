@@ -85,6 +85,7 @@
     setManagement: body => request(null, {action: 'setManagement', ...body}),
     hankyoList: () => request({action: 'hankyoList'}),
     hankyoGet: id => request({action: 'hankyoGet', id}),
+    hankyoImport: body => request(null, {action: 'hankyoImport', ...body}, 120000),
     hankyoCheckRequest: () => request(null, {action: 'hankyoCheckRequest'}),
     hankyoCheckStatus: () => request({action: 'hankyoCheckStatus'}),
     hankyoUpdate: body => request(null, {action: 'hankyoUpdate', ...body}),
