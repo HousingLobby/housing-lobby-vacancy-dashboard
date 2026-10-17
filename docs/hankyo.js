@@ -95,7 +95,7 @@
       say(`JDSから${msg.items.length}件を読み取りました。登録しています…`);
       const r = await Api.hankyoImport({items: msg.items, store: msg.store});
       const store = {A: '県央店（諫早）', B: '長崎店'}[msg.store] || '';
-      say(`${store}：新規${r.added}件を取り込みました（すでにある${msg.items.length - r.added - (r.skipped || 0)}件はそのまま${r.skipped ? `、読み取れなかった${r.skipped}件は除外` : ''}）。`);
+      say(`${store}：JDSの${msg.items.length}件のうち、新規${r.added}件を取り込みました（残り${Math.max(0, msg.items.length - r.added)}件は、すでに登録済みか、読み取れなかったためそのままです）。`);
       $('import-done').hidden = false; list = null;
     } catch (e) { say('取り込めませんでした：' + e.message, true); }
     importing = false;
