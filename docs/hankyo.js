@@ -73,6 +73,7 @@
     $('d-msg').textContent = d.message || '（内容の記録なし）';
     $('d-reply').value = d.reply || '';
     $('d-message').textContent = '';
+    fillTplForm(d);
     $('d-expire').textContent = `この記録は ${d.expire} に自動削除されます（受付日から${list ? list.keepDays : 40}日）。`;
   }
 
@@ -101,6 +102,30 @@
     importing = false;
   }
 
+  // 返信文のテンプレート（/suumo スキルと同じ文面）。空室かどうかは担当者がリアプロBBで確認して選ぶ
+  const SIGN = ['◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆', '〒850-0004', '長崎県長崎市下西山町1-5', '株式会社ハウジングロビー', 'TEL | 095-893-5056', 'FAX | 095-893-5057', 'https://www.h-lobby.jp/', '◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆'].join('\n');
+  const LINE = 'https://line.me/R/ti/p/@291ytred';
+  const splitRoom = prop => { const m = String(prop || '').match(/^(.*?)\s*([0-9０-９]{2,4})$/); return m ? {prop: m[1], room: m[2]} : {prop: String(prop || ''), room: ''}; };
+  const mdOf = iso => { const [y, mo, d] = iso.split('-').map(Number); const dt = new Date(Date.UTC(y, mo - 1, d + 2)); return `${dt.getUTCMonth() + 1}/${dt.getUTCDate()}`; };
+  function makeReply(k) {
+    const name = (current.name || 'お客様').replace(/様\s*$/, '') + '様';
+    const prop = k.prop.trim(), room = k.room.trim(), roomTxt = room ? `${room}号室` : '';
+    const head = `${name}\n\nはじめまして！株式会社ハウジングロビーです。\n\nこの度はSUUMOより\n【${prop}】${roomTxt}へお問い合わせありがとうございます！`;
+    if (k.kind === 'no') {
+      return `${head}\n\n誠に申し訳ございませんが、こちらの物件につきましては、\n他のお客様よりお申込が入ったため、ご紹介が出来かねる状況です。\n${k.other.trim() ? '\n' + k.other.trim() + '\n' : ''}\n今お探しの条件などをお知らせいただけますと、他の物件もご紹介可能です！\nお気軽にご相談ください。\n\n他の物件をご希望の場合は、以下URLの弊社公式LINEよりお問い合わせください。\n${LINE}\n\n是非よろしくお願いします！\n\n${SIGN}`;
+    }
+    const state = k.kind === 'soon' ? `こちらのお部屋は現在入居中のため、ご内見可能時期は${k.date ? mdOf(k.date) : '○/○'}以降となります。` : 'こちら現在空室となっております。';
+    const lp = k.lp.trim() ? `\nお部屋の写真や周辺環境は、こちらのページでもご覧いただけます！\n${k.lp.trim()}\n` : '';
+    return `${head}\n${state}\n物件の資料をお送りいたしますのでご確認くださいませ。\n${lp}\n★内見予約の受付は公式LINEにて行っております。（当社管理物件のみ）\n弊社ではお客様のみでお部屋を見ていただく“かってに内見（セルフ内見）”\nを行っております。\n\nかってに内見ご利用で【仲介手数料が50％off！】となっております。\n※3分程度の簡単なアンケートにご回答いただくことが条件です。\n\nかってに内見のご登録はコチラから！\n　　　　　↓ ↓ ↓\n${LINE}\n（利用時間：9:00〜18:00）\n\n是非よろしくお願いします！\n\n${SIGN}`;
+  }
+  function fillTplForm(d) {
+    const sp = d.room ? {prop: d.property, room: d.room} : splitRoom(d.property);
+    $('tpl-prop').value = sp.prop; $('tpl-room').value = sp.room; $('tpl-lp').value = d.lp || ''; $('tpl-other').value = ''; $('tpl-date').value = '';
+    $('tpl-kind').value = /申込|募集終了|紹介不可/.test(d.status || '') ? 'no' : /解約予定/.test(d.status || '') ? 'soon' : 'vacant';
+    syncTplKind();
+  }
+  function syncTplKind() { const k = $('tpl-kind').value; $('tpl-date-wrap').hidden = k !== 'soon'; $('tpl-other-wrap').hidden = k !== 'no'; }
+
   async function route() {
     const id = decodeURIComponent(location.hash.slice(1));
     if (id === 'import') { runImport(); return; }
@@ -126,6 +151,14 @@
     $('search').addEventListener('input', () => list && renderList());
     $('d-subject-copy').addEventListener('click', e => copyText($('d-subject').textContent, e.currentTarget));
     $('check-btn').addEventListener('click', async () => { try { $('check-btn').disabled = true; const r = await Api.hankyoCheckRequest(); renderCheck(r.check); } catch (e) { $('check-btn').disabled = false; $('check-status').textContent = '依頼できませんでした：' + e.message; $('check-status').className = 'save-message error'; } });
+    $('tpl-kind').addEventListener('change', syncTplKind);
+    $('tpl-make').addEventListener('click', () => {
+      const k = {kind: $('tpl-kind').value, prop: $('tpl-prop').value, room: $('tpl-room').value, date: $('tpl-date').value, lp: $('tpl-lp').value, other: $('tpl-other').value};
+      if (!k.prop.trim()) { $('d-message').textContent = '物件名を入れてください'; $('d-message').className = 'save-message error'; return; }
+      if (k.kind === 'soon' && !k.date) { $('d-message').textContent = '解約日を入れてください（内見可能日は、解約日の2日後で入ります）'; $('d-message').className = 'save-message error'; return; }
+      $('d-reply').value = makeReply(k);
+      $('d-message').textContent = '返信文を作りました。内容を確認して、「手直しを保存」を押してください'; $('d-message').className = 'save-message';
+    });
     $('import-done').addEventListener('click', () => { location.hash = ''; });
     $('d-copy').addEventListener('click', e => copyText($('d-reply').value, e.currentTarget));
     $('d-save').addEventListener('click', () => save({reply: $('d-reply').value}, '手直しを保存しました'));
