@@ -10,8 +10,9 @@
   <script defer src="vendor/msal-browser-2.38.3.min.js"></script>
   <script defer src="config.js?v=20261008gas2"></script>
   <script defer src="auth.js?v=20261011e"></script>
+  <script defer src="snapshot-current.js?v=20261008auth"></script>
   <script defer src="api.js?v=20261017a"></script>
-  <script defer src="hankyo.js?v=20261017d"></script>
+  <script defer src="hankyo.js?v=20261017e"></script>
 </head>
 <body>
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
@@ -67,10 +68,11 @@
               <label>物件名<input id="tpl-prop" type="text"></label>
               <label>号室<input id="tpl-room" type="text" placeholder="例：402" style="min-width:90px"></label>
               <label id="tpl-date-wrap" hidden>解約日<input id="tpl-date" type="date"></label>
-              <label class="search-field">物件LPのURL<input id="tpl-lp" type="text" placeholder="空室・解約予定のとき（なければ空欄）"></label>
+              <label class="search-field">物件LPのURL<input id="tpl-lp" type="text" placeholder="空欄なら、返信文を作るときに自動で作成を依頼します"></label>
             </div>
             <label id="tpl-other-wrap" hidden style="display:block;margin-top:8px;font-size:.79rem;font-weight:800;color:#536b7d">別の部屋の案内（任意）<textarea id="tpl-other" rows="3" style="width:100%;border:1px solid #cbd9e2;border-radius:8px;padding:8px 10px;font-size:.9rem" placeholder="例：同じ建物の【ＴＳビル】502号室（1K・賃料48,000円）は、&#10;現在空室となっております。&#10;（LPのURLがあれば、次の行に書く）"></textarea></label>
             <div class="button-row" style="margin-top:10px"><button type="button" class="secondary-button" id="tpl-make">返信文を作る（下の欄に入ります）</button></div>
+            <p class="save-message" id="tpl-lp-state" role="status"></p>
             <p class="footnote" style="margin:6px 0 0">空室かどうかは、<b>リアプロBBで確認してから</b>選んでください。作った文は下の欄で直して、「手直しを保存」を押します。</p>
           </details>
           <textarea class="hk-reply" id="d-reply" aria-label="返信文"></textarea>

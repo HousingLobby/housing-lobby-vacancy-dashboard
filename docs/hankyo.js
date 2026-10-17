@@ -73,7 +73,7 @@
     $('d-msg').textContent = d.message || '（内容の記録なし）';
     $('d-reply').value = d.reply || '';
     $('d-message').textContent = '';
-    fillTplForm(d);
+    fillTplForm(d); clearTimeout(lpTimer); lpFor = null; $('tpl-lp-state').textContent = '';
     $('d-expire').textContent = `この記録は ${d.expire} に自動削除されます（受付日から${list ? list.keepDays : 40}日）。`;
   }
 
@@ -124,6 +124,36 @@
     $('tpl-kind').value = /申込|募集終了|紹介不可/.test(d.status || '') ? 'no' : /解約予定/.test(d.status || '') ? 'soon' : 'vacant';
     syncTplKind();
   }
+  // 物件LPの自動作成：空室一覧の部屋（Asanaタスク）を物件名＋号室で探し、LP作成の待ち行列に依頼する（作成はMacの処理）
+  const nz = s => String(s || '').normalize('NFKC').replace(/\s+/g, '').toLowerCase();
+  let vacCache = null, lpTimer = null, lpFor = null;
+  async function findRoomTask(prop, room) {
+    if (!vacCache) vacCache = (await Api.snapshot()).vacancies || [];
+    return vacCache.filter(v => nz(v.p) === nz(prop) && nz(v.r) === nz(room));
+  }
+  const lpSay = (t, err) => { $('tpl-lp-state').textContent = t; $('tpl-lp-state').className = 'save-message' + (err ? ' error' : ''); };
+  async function ensureLp(k) {
+    const hits = await findRoomTask(k.prop, k.room);
+    if (hits.length !== 1) { lpSay(hits.length ? '同じ部屋が複数あり、LPを自動で依頼できません。部屋ページから依頼してください' : '空室一覧に該当の部屋が見つからないため、LPを自動で依頼できません（LPなしで作成しました）', true); return; }
+    const task = hits[0].id; lpFor = {task, id: current.id};
+    let st = await Api.lpStatus(task);
+    if (st.state === 'none' || st.state === '失敗') st = await Api.lpRequest({task, passcode: Api.prefs.get().passcode || ''});
+    watchLp(st, k);
+  }
+  function watchLp(st, k) {
+    clearTimeout(lpTimer);
+    if (!lpFor || lpFor.id !== current.id) return; // 別のお客様に移った
+    if (st.state === '完了' && st.url) {
+      $('tpl-lp').value = st.url;
+      // 返信文が手直しされていなければ、URL入りで作り直す
+      if ($('d-reply').value === makeReply({...k, lp: ''})) { $('d-reply').value = makeReply({...k, lp: st.url}); lpSay('物件LPができました。URLを返信文に入れました。内容を確認して「手直しを保存」を押してください'); }
+      else lpSay('物件LPができました：' + st.url + '（返信文を手直し済みのため、URLは自動で入れていません）');
+      return;
+    }
+    if (st.state === '失敗') { lpSay('LPを作成できませんでした：' + (st.message || '原因不明'), true); return; }
+    lpSay(st.state === '作成中' ? '物件LPを作成しています…（数分〜十数分。このページを開いたままにすると、できたら自動でURLが入ります）' : '物件LPの作成を依頼しました。Macの処理が始まるのを待っています…');
+    lpTimer = setTimeout(async () => { try { watchLp(await Api.lpStatus(lpFor.task), k); } catch (e) { lpTimer = setTimeout(() => watchLp(st, k), 30000); } }, 20000);
+  }
   function syncTplKind() { const k = $('tpl-kind').value; $('tpl-date-wrap').hidden = k !== 'soon'; $('tpl-other-wrap').hidden = k !== 'no'; }
 
   async function route() {
@@ -157,6 +187,8 @@
       if (!k.prop.trim()) { $('d-message').textContent = '物件名を入れてください'; $('d-message').className = 'save-message error'; return; }
       if (k.kind === 'soon' && !k.date) { $('d-message').textContent = '解約日を入れてください（内見可能日は、解約日の2日後で入ります）'; $('d-message').className = 'save-message error'; return; }
       $('d-reply').value = makeReply(k);
+      lpSay('');
+      if (k.kind !== 'no' && !k.lp.trim()) ensureLp(k).catch(e => lpSay('LPの依頼に失敗しました：' + e.message, true));
       $('d-message').textContent = '返信文を作りました。内容を確認して、「手直しを保存」を押してください'; $('d-message').className = 'save-message';
     });
     $('import-done').addEventListener('click', () => { location.hash = ''; });
