@@ -125,7 +125,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-16-hankyo-subject';
+const APP_VERSION = '2026-10-19-promo-unset';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true};
 
@@ -796,7 +796,14 @@ function buildPromotion_(month) {
     byBroker: tally_(apps, x => x.f[af.broker]),
     byContract: tally_(apps, x => x.f[af.contract]),
     byRoute: tally_(apps, x => x.f[af.route]),
-    bySelfViewing: tally_(apps, x => x.f[af.selfViewing])
+    bySelfViewing: tally_(apps, x => x.f[af.selfViewing]),
+    // 項目が空（未設定）の申込のタスク名とID。内訳の「未設定」から確認できるように（部屋名のみ・個人名は含まない）
+    unset: (() => {
+      const keys = {byStatus: CFG.fields.s, byArea: CFG.fields.a, byKind: CFG.fields.m, byBroker: af.broker, byContract: af.contract, byRoute: af.route, bySelfViewing: af.selfViewing};
+      const o = {};
+      Object.keys(keys).forEach(k => { const list = apps.filter(x => !x.f[keys[k]]).map(x => ({name: x.t.name, gid: x.t.gid})); if (list.length) o[k] = list.slice(0, 50); });
+      return o;
+    })()
   };
 
   // 反響（セルフ内見予約表）

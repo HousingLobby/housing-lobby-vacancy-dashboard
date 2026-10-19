@@ -48,3 +48,4 @@ body.auth-wait main,body.auth-wait .outbox-bar{visibility:hidden}
 .copy-mini{border:1px solid #b9cbd7;background:#fff;color:#1b5d85;border-radius:7px;padding:1px 9px;font-size:.76rem;font-weight:700;margin-left:6px}
 @media(max-width:800px){.hk-detail{grid-template-columns:1fr}}
 .hk-last{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.unset-box{margin:6px 0 10px;font-size:.84rem}.unset-box summary{cursor:pointer;color:#9b5a19;font-weight:800}.unset-box ul{margin:6px 0;padding-left:1.2em}.unset-box .muted,.unset-note{color:#6a7f8e;font-size:.78rem}
