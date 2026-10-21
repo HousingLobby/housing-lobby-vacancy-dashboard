@@ -125,7 +125,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-19-promo-unset';
+const APP_VERSION = '2026-10-22-patrol-plan';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true};
 
@@ -152,6 +152,8 @@ function handle_(action, body) {
     case 'hankyoUpsert': return hankyoUpsert_(body);
     // 反響対応（ログイン必須）
     case 'hankyoImport': return hankyoImport_(body);
+    case 'getPatrolPlan': return getPatrolPlan_(body.date);
+    case 'savePatrolPlan': return savePatrolPlan_(body);
     case 'hankyoCheckRequest': return hankyoCheckRequest_();
     case 'hankyoCheckStatus': return {check: hankyoCheckGet__()};
     case 'hankyoCheckGet': return hankyoCheckWorkerGet_(body.key);
@@ -1624,4 +1626,40 @@ function hankyoCheckUpdate_(body) {
     added: Number(body.added) || 0, updated: Number(body.updated) || 0, found: Number(body.found) || 0, store: store});
   if (body.state === '完了' && store) { const l = hankyoLastGet__(); l[store] = new Date().toISOString(); PropertiesService.getScriptProperties().setProperty('HANKYO_LAST', JSON.stringify(l)); }
   return {ok: true};
+}
+
+
+/* ---------- 月例巡回の班分け（巡回日ごとに、班・担当エリア・担当物件を保存して全員で共有） ---------- */
+// 保存先はスクリプトプロパティ PP_YYYY-MM-DD（Asanaには書かない）。索引 PP_INDEX に新しい順で最大12件
+
+function ppIndex_() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('PP_INDEX') || '[]'); } catch (_) { return []; } }
+
+function getPatrolPlan_(date) {
+  const idx = ppIndex_();
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? date : idx[0];
+  if (!d) return {plan: null, dates: idx};
+  const raw = PropertiesService.getScriptProperties().getProperty('PP_' + d);
+  return {plan: raw ? JSON.parse(raw) : null, dates: idx};
+}
+
+function savePatrolPlan_(body) {
+  const date = String(body.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('巡回日が正しくありません');
+  const groups = (Array.isArray(body.groups) ? body.groups : []).slice(0, 12).map(g => ({
+    name: hankyoClean_(g.name, 30) || '班', member: hankyoClean_(g.member, 80), area: hankyoClean_(g.area, 20),
+    props: (Array.isArray(g.props) ? g.props : []).slice(0, 30).map(x => ({key: hankyoClean_(x.key, 120), p: hankyoClean_(x.p, 80), a: hankyoClean_(x.a, 20),
+      rooms: (Array.isArray(x.rooms) ? x.rooms : []).slice(0, 30).map(r => String(r).replace(/[^0-9]/g, '')).filter(Boolean)}))
+  }));
+  const plan = {date: date, groups: groups, savedAt: new Date().toISOString(), by: CURRENT_USER ? CURRENT_USER.name : ''};
+  const json = JSON.stringify(plan);
+  if (json.length > 8500) throw new Error('班分けが大きすぎます（班や物件を減らしてください）');
+  const pr = PropertiesService.getScriptProperties();
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    pr.setProperty('PP_' + date, json);
+    const idx = [date].concat(ppIndex_().filter(x => x !== date)).sort().reverse();
+    idx.slice(12).forEach(old => pr.deleteProperty('PP_' + old));
+    pr.setProperty('PP_INDEX', JSON.stringify(idx.slice(0, 12)));
+  } finally { lock.releaseLock(); }
+  return {ok: true, plan: plan};
 }
