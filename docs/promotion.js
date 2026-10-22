@@ -89,7 +89,13 @@
       return `<tr><td><a class="room-link" href="${dash.roomUrl(v.id)}">${esc(v.p)} ${esc(v.r || '')}</a></td><td class="num">${days === null ? '—' : days < 0 ? '退去前' : `${days}日`}</td><td>${esc(v.a || '地区なし')}</td><td>${esc(v.c || '空欄')}</td></tr>`;
     }).join('') + (zero.length > 50 ? `<tr><td colspan="4" class="empty">ほか${zero.length - 50}件</td></tr>` : '') : '<tr><td colspan="4" class="empty">すべての空室に反響があります</td></tr>';
   };
+  let ME = null;
+  const meBtn = el('me-btn');
+  if (meBtn && window.MonthEnd) {
+    ME = window.MonthEnd.init({button: meBtn, status: el('me-status'), result: el('me-result'), last: el('me-last'), month: () => { el('me-panel').hidden = false; return select.value; }});
+    meBtn.addEventListener('click', () => { el('me-panel').hidden = false; });
+  }
   select.addEventListener('change', () => render(select.value, false));
   el('promo-refresh').addEventListener('click', () => render(select.value, true));
-  window.addEventListener('promotion:show', () => { if (!started) { started = true; render(select.value, false); } });
+  window.addEventListener('promotion:show', () => { if (!started) { started = true; render(select.value, false); } if (ME) ME.refresh(); });
 })();
