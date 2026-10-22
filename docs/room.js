@@ -61,7 +61,10 @@
   const propertyLocation = addressBook?.properties?.[`${propertyKey}|${room.a || ''}`];
   el('room-address').textContent = propertyLocation?.address || '住所を確認中';
   // 駐車場区画（月例巡回ページで登録したメモ）
-  api.parking().then(r => { const t = (r.parking || {})[`${propertyKey}|${room.a || ''}`]; if (t) { el('room-parking').textContent = `🅿 駐車場区画：${t}`; el('room-parking').hidden = false; } }).catch(() => {});
+  const parkLines = room.pk ? [`🅿 駐車場NO（Asana）：${room.pk}`] : [];
+  const showPark = () => { if (parkLines.length) { el('room-parking').textContent = parkLines.join('　／　'); el('room-parking').hidden = false; } };
+  showPark();
+  api.parking().then(r => { const t = (r.parking || {})[`${propertyKey}|${room.a || ''}`]; if (t) { parkLines.push(`駐車場メモ：${t}`); showPark(); } }).catch(() => {});
   el('location-help').textContent = propertyLocation?.address
     ? '車でのルートを開きます。出発地はGoogleマップで変更できます。'
     : '住所を確認でき次第、ルート検索を利用できます。';

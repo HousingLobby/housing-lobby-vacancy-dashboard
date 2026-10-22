@@ -35,6 +35,7 @@ const CFG = {
   },
   areas: ['長崎中央', '長崎北', '諫早', '大村'],
   moveOutField: '1201222607611150', // 解約日（テキスト）。空室日数の起点
+  parkingField: '1201240076046576', // 駐車場NO（【空室一覧】の項目。読み取りのみ）
   applicationFields: {
     date: '1204061090287264', broker: '1214016908312487', contract: '1214044050776097',
     route: '1214044050776101', selfViewing: '1214044050776108'
@@ -125,7 +126,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-22-parking';
+const APP_VERSION = '2026-10-22-parking-asana';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true};
 
@@ -286,6 +287,7 @@ function buildSnapshot_() {
     Object.keys(CFG.fields).forEach(k => { row[k] = byId[CFG.fields[k]] || null; });
     row.k = byId[CFG.keyTypeField] || null;
     row.v = parseJpDate_(byId[CFG.moveOutField]); // 解約日（YYYY-MM-DD）
+    row.pk = byId[CFG.parkingField] || null;        // 駐車場NO（読み取りのみ）
     vacancies.push(row);
   });
 
