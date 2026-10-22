@@ -126,9 +126,9 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-22-colorcone-na';
+const APP_VERSION = '2026-10-22-monthend';
 
-const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true};
+const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
 function handle_(action, body) {
   switch (action) {
@@ -161,6 +161,11 @@ function handle_(action, body) {
     case 'hankyoCheckStatus': return {check: hankyoCheckGet__()};
     case 'hankyoCheckGet': return hankyoCheckWorkerGet_(body.key);
     case 'hankyoCheckUpdate': return hankyoCheckUpdate_(body);
+    // 月末集計（ボタン→待ち行列→Mac側のClaudeが集計して結果を書き戻す）
+    case 'monthEndRequest': return monthEndRequest_(body);
+    case 'monthEndStatus': return monthEndStatus_();
+    case 'monthEndGet': return monthEndWorkerGet_(body.key);
+    case 'monthEndUpdate': return monthEndUpdate_(body);
     case 'hankyoList': return hankyoList_();
     case 'hankyoGet': return hankyoGet_(body.id);
     case 'hankyoUpdate': return hankyoUpdate_(body);
@@ -1629,6 +1634,54 @@ function hankyoCheckUpdate_(body) {
   hankyoCheckPut__({state: body.state, at: new Date().toISOString(), by: cur.by || '', message: hankyoClean_(body.message, 200),
     added: Number(body.added) || 0, updated: Number(body.updated) || 0, found: Number(body.found) || 0, store: store});
   if (body.state === '完了' && store) { const l = hankyoLastGet__(); l[store] = new Date().toISOString(); PropertiesService.getScriptProperties().setProperty('HANKYO_LAST', JSON.stringify(l)); }
+  return {ok: true};
+}
+
+
+/* ---------- 月末集計（ボタン→待ち行列→Mac側のClaudeが集計→結果を書き戻す） ---------- */
+// 状態＝スクリプトプロパティ MONTHEND（{state: 依頼中|実行中|完了|失敗, month, at, by, message}）、結果＝MONTHEND_RESULT（数字と漏れ候補の一覧。9KB以内）。
+// 集計内容：①Asanaの反響集計（反響(広義)・内見率・成約率・経由別・仲介同行）②SUUMOの登録漏れ（ダッシュボードに取り込み済みのJDS反響とAsanaを照合）③仲介同行（Teams「リーシング」の報告とAsanaを照合）。Asanaへの書き込みはしない。
+
+function monthEndGet__() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('MONTHEND') || 'null'); } catch (_) { return null; } }
+function monthEndResultGet__() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('MONTHEND_RESULT') || 'null'); } catch (_) { return null; } }
+function monthEndPut__(o) { PropertiesService.getScriptProperties().setProperty('MONTHEND', JSON.stringify(o)); }
+
+function monthEndStatus_() { return {monthEnd: monthEndGet__(), result: monthEndResultGet__(), lastChecked: hankyoLastGet__()}; }
+
+function monthEndRequest_(body) {
+  const month = String(body.month || '');
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('対象月が正しくありません');
+  const cur = monthEndGet__();
+  if (cur && (cur.state === '依頼中' || (cur.state === '実行中' && Date.now() - new Date(cur.at).getTime() < 40 * 60000))) return {monthEnd: cur};
+  const o = {state: '依頼中', month: month, at: new Date().toISOString(), by: CURRENT_USER ? CURRENT_USER.name : ''};
+  monthEndPut__(o);
+  return {monthEnd: o};
+}
+
+// Mac側が呼ぶ：依頼があれば返す。対象月にJDSから取り込み済みの反響（SUUMOの照合用）と、店舗ごとの最終取り込み時刻つき
+function monthEndWorkerGet_(key) {
+  lpWorkerOk_(key);
+  const cur = monthEndGet__();
+  if (!cur || cur.state !== '依頼中') return {request: null};
+  const all = hankyoRows_(hankyoSheet_());
+  const items = all.filter(r => String(r['受付日']).slice(0, 7) === cur.month)
+    .map(r => ({id: r.id, date: r['受付日'], name: r['顧客名'], store: r['店舗'], property: r['物件名'], room: r['号室']}));
+  const oldest = all.reduce((m, r) => (!m || String(r['受付日']) < m ? String(r['受付日']) : m), '');
+  return {request: cur, hankyo: items, oldest: oldest, lastChecked: hankyoLastGet__(), counts: hankyoCounts_()[cur.month] || null};
+}
+
+function monthEndUpdate_(body) {
+  lpWorkerOk_(body.key);
+  if (['実行中', '完了', '失敗'].indexOf(body.state) < 0) throw new Error('状態が不正です');
+  const cur = monthEndGet__() || {};
+  monthEndPut__({state: body.state, month: cur.month || '', at: new Date().toISOString(), by: cur.by || '', message: hankyoClean_(body.message, 200)});
+  if (body.state === '完了' && body.result && typeof body.result === 'object') {
+    let r = body.result, txt = JSON.stringify(r);
+    // プロパティは1つ9KBまで。超えるときは漏れ候補の一覧を短くする
+    ['suumoMissing', 'dohkouMissing'].forEach(k => { while (txt.length > 8500 && Array.isArray(r[k]) && r[k].length > 5) { r[k] = r[k].slice(0, r[k].length - 5); r[k + 'Cut'] = true; txt = JSON.stringify(r); } });
+    if (txt.length > 8800) throw new Error('結果が大きすぎます');
+    PropertiesService.getScriptProperties().setProperty('MONTHEND_RESULT', txt);
+  }
   return {ok: true};
 }
 

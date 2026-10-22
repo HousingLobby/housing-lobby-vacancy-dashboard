@@ -11,9 +11,9 @@
   <script defer src="config.js?v=20261008gas2"></script>
   <script defer src="auth.js?v=20261011e"></script>
   <script defer src="snapshot-current.js?v=20261008auth"></script>
-  <script defer src="api.js?v=20261022b"></script>
+  <script defer src="api.js?v=20261022m"></script>
   <script defer src="nav.js?v=20261022"></script>
-  <script defer src="hankyo.js?v=20261017e"></script>
+  <script defer src="hankyo.js?v=20261022m"></script>
 </head>
 <body data-page="hankyo">
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
@@ -34,6 +34,14 @@
         <div class="hk-last" id="check-last"></div>
         <div class="button-row"><button type="button" class="primary-button" id="check-btn">反響データ確認</button><span class="save-message" id="check-status" role="status"></span></div>
         <p class="footnote" style="margin:8px 0 0">ボタンを押すと依頼が入ります。取り込みは、Macで担当者が実行したときに行われます（Claudeアプリの「Scheduled」→「反響データ確認」→「今すぐ実行」、または「反響データ確認をして」と依頼）。取り込んだ反響の返信文は、「スーモ」の対応で作成します。</p>
+      </div>
+      <div class="panel hk-monthend">
+        <div class="panel-heading"><h2>月末集計</h2><span>反響の数字・SUUMOの登録漏れ・仲介同行の確認</span></div>
+        <div class="filters" style="margin-bottom:10px"><label>対象月<select id="me-month"></select></label></div>
+        <div class="hk-last" id="me-last"></div>
+        <div class="button-row"><button type="button" class="primary-button" id="me-btn">月末集計</button><span class="save-message" id="me-status" role="status"></span></div>
+        <p class="footnote" style="margin:8px 0 0">押すと、①Asana「セルフ内見予約表」の反響数・内見率・成約率、②JDSから取り込み済みの反響とAsanaの照合（SUUMOの登録漏れ）、③Teams「リーシング」の同行報告とAsanaの照合を行い、結果をここに表示します（数分かかります）。<b>先に上の「反響データ確認」を長崎店・県央店の両方で実行しておくと、SUUMOの漏れを正確に確認できます。</b>Asanaには書き込みません。</p>
+        <div id="me-result" hidden></div>
       </div>
       <div class="panel hk-bm">
         <div class="panel-heading"><h2>自分のPCから取り込む（ブックマーク）</h2><span>Windows・Macどちらでも／Edge・Chrome</span></div>

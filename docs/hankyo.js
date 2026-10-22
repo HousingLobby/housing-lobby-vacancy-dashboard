@@ -51,11 +51,60 @@
     try { const prev = $('check-status').textContent; const r = await Api.hankyoCheckStatus(); renderCheck(r.check); if (r.check && r.check.state === '完了') { list = null; await loadList(); } } catch (e) { pollTimer = setTimeout(pollCheck, 20000); }
   }
 
+
+  // 月末集計（ボタン→Macのワーカーが集計→結果を表示）
+  let meTimer = null;
+  const pct = v => v == null ? '―' : (Math.round(v * 1000) / 10) + '%';
+  const meFmt = iso => iso ? new Date(iso).toLocaleString('ja-JP', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : '';
+  function initMonthSelect() {
+    const now = new Date(Date.now() + 9 * 3600e3), opts = [];
+    for (let i = 0; i < 4; i++) { const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1)); opts.push(d.toISOString().slice(0, 7)); }
+    $('me-month').innerHTML = opts.map((ym, i) => `<option value="${ym}">${monthLabel(ym)}${i === 0 ? '（今月）' : i === 1 ? '（先月）' : ''}</option>`).join('');
+    $('me-month').value = now.getUTCDate() <= 10 ? opts[1] : opts[0]; // 月初は先月分、それ以外は今月分
+  }
+  function missList(rows, cols) {
+    if (!rows || !rows.length) return '<p class="save-message" style="margin:4px 0">漏れ候補はありません</p>';
+    return `<div class="table-scroll"><table class="list-table"><thead><tr>${cols.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${esc(r[c[1]])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }
+  function renderMeResult(r) {
+    const box = $('me-result');
+    if (!r) { box.hidden = true; return; }
+    const kpi = (l, v, sm) => `<div class="hk-count"><span>${l}</span><strong>${v}</strong>${sm ? `<small>${sm}</small>` : ''}</div>`;
+    const su = r.suumo || {}, dk = r.dohkou || {};
+    const sMiss = (r.suumoMissing || []).length, dMiss = (r.dohkouMissing || []).length;
+    box.innerHTML = `<h3 style="margin:18px 0 8px">${monthLabel(r.month)}の集計 <small style="font-weight:400;color:#697d8b">（${meFmt(r.at)} 時点）</small></h3>
+      <div class="hk-counts">${kpi('反響（広義）', (r.total ?? '―') + '件', `反響${r.hankyo ?? 0}＋かってに内見${r.katteni ?? 0}`)}${kpi('内見率', pct(r.naikenRate), `内見${r.naiken ?? 0}件`)}${kpi('成約率', pct(r.seiyakuRate), `申込${r.moushikomi ?? 0}件`)}${kpi('内見からの成約率', pct(r.naikenSeiyakuRate))}${kpi('仲介同行（別軸）', (dk.n ?? 0) + '件', `申込${dk.moushikomi ?? 0}件`)}</div>
+      <h4 style="margin:14px 0 6px">反響経由（広義）</h4><p style="margin:0">${(r.byKeiyu || []).map(x => `${esc(x[0])} ${x[1]}件`).join('・') || '―'}</p>
+      <h4 style="margin:16px 0 6px">SUUMO登録漏れの確認 <span class="badge ${sMiss ? 'warn' : 'good'}">${sMiss ? `漏れ候補 ${sMiss}件` : '漏れなし'}</span></h4>
+      <p class="footnote" style="margin:0 0 6px">JDS取り込み済み ${su.jds ?? '―'}件／Asana登録 ${su.asana ?? '―'}件</p>
+      ${missList(r.suumoMissing, [['受付日', 'd'], ['お客様', 'n'], ['物件', 'p'], ['店舗', 's']])}${r.suumoMissingCut ? '<p class="footnote">※一部のみ表示</p>' : ''}
+      <h4 style="margin:16px 0 6px">仲介同行の確認 <span class="badge ${dMiss ? 'warn' : 'good'}">${dMiss ? `未登録候補 ${dMiss}件` : '漏れなし'}</span></h4>
+      <p class="footnote" style="margin:0 0 6px">Teams報告 ${r.dohkouTeams ?? '―'}件／Asana登録 ${r.dohkouAsana ?? '―'}件</p>
+      ${missList(r.dohkouMissing, [['内見日', 'd'], ['業者', 'v'], ['物件・号室', 'p']])}${r.dohkouMissingCut ? '<p class="footnote">※一部のみ表示</p>' : ''}
+      ${(r.notes || []).length ? `<ul class="footnote" style="margin:12px 0 0">${r.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}`;
+    box.hidden = false;
+  }
+  function renderMe(res) {
+    const c = res.monthEnd, el = $('me-status'), btn = $('me-btn');
+    const fmt = iso => iso ? new Date(iso).toLocaleString('ja-JP', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : '未確認';
+    const l = res.lastChecked || {};
+    $('me-last').innerHTML = `<span class="badge ${l.B ? 'good' : 'warn'}">JDS取り込み 長崎店：${fmt(l.B)}</span> <span class="badge ${l.A ? 'good' : 'warn'}">県央店（諫早）：${fmt(l.A)}</span>`;
+    const busy = c && (c.state === '依頼中' || c.state === '実行中');
+    btn.disabled = Boolean(busy);
+    const t = c && c.at ? meFmt(c.at) : '';
+    const text = !c ? '' : {'依頼中': `${monthLabel(c.month)}分を依頼しました。Macの処理が始まるのを待っています…`, '実行中': `${monthLabel(c.month)}分を集計中…（数分かかります）`, '完了': `${t} ${monthLabel(c.month)}分の集計が終わりました`, '失敗': `${t} 集計できませんでした：${c.message || '原因不明'}`}[c.state] || '';
+    el.textContent = text; el.className = 'save-message' + (c && c.state === '失敗' ? ' error' : '');
+    renderMeResult(busy ? null : res.result);
+    clearTimeout(meTimer);
+    if (busy) meTimer = setTimeout(pollMe, 10000);
+  }
+  async function pollMe() { try { renderMe(await Api.monthEndStatus()); } catch (e) { meTimer = setTimeout(pollMe, 20000); } }
+
   async function loadList() {
     try {
       list = await Api.hankyoList();
       $('keep-note').textContent = `お客様の情報は受付日から${list.keepDays}日保存`;
-      renderCounts(); renderList(); renderCheck(list.check); renderLast(list.lastChecked || {}); showError('');
+      renderCounts(); renderList(); renderCheck(list.check); renderLast(list.lastChecked || {}); showError(''); pollMe();
     } catch (e) { showError('反響の一覧を取得できませんでした：' + e.message); }
   }
 
@@ -181,6 +230,8 @@
     $('search').addEventListener('input', () => list && renderList());
     $('d-subject-copy').addEventListener('click', e => copyText($('d-subject').textContent, e.currentTarget));
     $('check-btn').addEventListener('click', async () => { try { $('check-btn').disabled = true; const r = await Api.hankyoCheckRequest(); renderCheck(r.check); } catch (e) { $('check-btn').disabled = false; $('check-status').textContent = '依頼できませんでした：' + e.message; $('check-status').className = 'save-message error'; } });
+    initMonthSelect();
+    $('me-btn').addEventListener('click', async () => { try { $('me-btn').disabled = true; const r = await Api.monthEndRequest($('me-month').value); renderMe({monthEnd: r.monthEnd, lastChecked: (list && list.lastChecked) || {}, result: null}); pollMe(); } catch (e) { $('me-btn').disabled = false; $('me-status').textContent = '依頼できませんでした：' + e.message; $('me-status').className = 'save-message error'; } });
     $('tpl-kind').addEventListener('change', syncTplKind);
     $('tpl-make').addEventListener('click', () => {
       const k = {kind: $('tpl-kind').value, prop: $('tpl-prop').value, room: $('tpl-room').value, date: $('tpl-date').value, lp: $('tpl-lp').value, other: $('tpl-other').value};

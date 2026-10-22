@@ -92,6 +92,8 @@
     hankyoImport: body => request(null, {action: 'hankyoImport', ...body}, 120000),
     hankyoCheckRequest: () => request(null, {action: 'hankyoCheckRequest'}),
     hankyoCheckStatus: () => request({action: 'hankyoCheckStatus'}),
+    monthEndRequest: month => request(null, {action: 'monthEndRequest', month}),
+    monthEndStatus: () => request({action: 'monthEndStatus'}),
     hankyoUpdate: body => request(null, {action: 'hankyoUpdate', ...body}),
     newId: () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`)
   };
