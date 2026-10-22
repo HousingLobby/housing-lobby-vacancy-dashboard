@@ -11,6 +11,8 @@
     .jk-setup>summary{list-style:none;cursor:pointer;margin-bottom:0;flex-wrap:wrap}.jk-setup>summary h2{white-space:nowrap}.jk-setup>summary::-webkit-details-marker{display:none}.jk-setup[open]>summary{margin-bottom:17px}.jk-caret{font-size:.7rem;color:#1b5d85;display:inline-block;transition:transform .15s}.jk-setup[open] .jk-caret{transform:rotate(180deg)}
     .jk-pass textarea{width:100%;border:1px solid #cbd9e2;border-radius:8px;padding:10px 12px;font-size:.95rem;resize:vertical;font-family:inherit}
     .jk-park{font-size:.8rem;color:#13262d;background:#fff8e8;border:1px solid #efdbad;border-radius:8px;padding:3px 8px;width:fit-content}.link-btn{border:0;background:none;color:#1b5d85;font-weight:700;font-size:.78rem;cursor:pointer;text-decoration:underline}
+    .jk-route{display:block;text-align:center;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:10px 12px;font-size:.9rem;min-height:0}
+    @media(max-width:420px){.jk-route{font-size:.8rem;padding:9px 8px}}
     .jk-groups{display:flex;flex-direction:column;gap:8px}
     .jk-g{display:grid;grid-template-columns:1fr 1.3fr 1fr 1fr 80px auto;gap:8px;align-items:end}
     .jk-g label{display:flex;flex-direction:column;gap:4px;font-size:.78rem;font-weight:800;color:#536b7d}
@@ -39,7 +41,7 @@
   <script defer src="snapshot-current.js?v=20261008auth"></script>
   <script defer src="api.js?v=20261022b"></script>
   <script defer src="nav.js?v=20261022"></script>
-  <script defer src="junkai.js?v=20261022i"></script>
+  <script defer src="junkai.js?v=20261022j"></script>
 </head>
 <body data-page="junkai">
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>

@@ -99,7 +99,7 @@
       return `<details class="jk-card" data-gi="${gi}"${openCards.has(gi) ? ' open' : ''}>
         <summary><div class="jk-sumrow"><h2>${esc(g.name || '班')}　<span style="font-size:.85rem;color:#617688">${esc(areasOf(g).join('・') || 'エリアなし')}</span></h2><span class="jk-caret">▼</span></div><div class="sub">${esc(g.member || '担当者未設定')}　｜　${list.length}物件・${rooms.length}部屋　｜　巡回済み ${done}/${rooms.length}</div>
         <div class="jk-progress"><i style="width:${rooms.length ? Math.round(done / rooms.length * 100) : 0}%"></i></div></summary>
-        ${addrs.length ? `<a class="secondary-button no-print" style="text-align:center;text-decoration:none" href="${esc(routeUrl(addrs))}" target="_blank" rel="noopener noreferrer">この班のルートをGoogleマップで開く（${addrs.length}か所）</a>` : ''}
+        ${addrs.length ? `<a class="secondary-button no-print jk-route" href="${esc(routeUrl(addrs))}" target="_blank" rel="noopener noreferrer">🗺 ルートをGoogleマップで開く（${addrs.length}か所）</a>` : ''}
         ${list.map((b, bi) => `<div class="jk-prop"><div class="top"><b>${bi + 1}. ${esc(b.p)}</b><button type="button" class="x no-print" data-g="${gi}" data-rm="${esc(b.key)}">外す</button></div>
           <div class="meta">${b.missing ? '※現在の空室一覧にありません（入居済みなど）' : `${esc(addressOf(b) || '住所未登録')}　｜　前回巡回 ${b.lastPatrol ? esc(b.lastPatrol) : '未巡回あり'}${b.maxDays != null ? `　｜　空室 最長${b.maxDays}日` : ''}`}</div>
           ${(() => { const pks = [...new Set((b.rooms || []).map(r => r.pk).filter(Boolean))]; return pks.length ? `<div class="jk-park">🅿 部屋の駐車区画（Asana）：${esc(pks.join(' ／ '))}</div>` : ''; })()}
