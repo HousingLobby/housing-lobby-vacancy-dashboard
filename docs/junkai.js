@@ -10,6 +10,7 @@
   const keyOf = (p, a) => String(p || '').normalize('NFKC').replace(/[\s・･.．\-‐‑–—－_（）()]+/g, '').toLowerCase() + '|' + (a || '');
   let data = null, buildings = {}, groups = [], plan = null;
   const openCards = new Set(); // 開いている班の表（番号）
+  let parking = {}; // 物件キー → 駐車場区画のメモ（全員で共有）
   const NONE = 'ー';
   // 班の担当エリア（最大2つ。「ー」はなし）
   const areasOf = g => [...new Set([g.area, g.area2].filter(a => a && a !== NONE))];
@@ -21,6 +22,7 @@
     for (const v of data.vacancies) {
       if (!v.p || !AREAS.includes(v.a)) continue;
       if (v.s !== '空室中' && v.s !== '入居中（退去予定）') continue;
+      if (isParkingLot(v)) continue; // 駐車場・ガレージの区画（P-07 など）は巡回の対象外
       const key = keyOf(v.p, v.a);
       const b = buildings[key] || (buildings[key] = {key, p: v.p, a: v.a, rooms: [], lastPatrol: null, maxDays: null});
       const last = idx[v.id] && idx[v.id].date;
@@ -34,6 +36,8 @@
     }
     for (const b of Object.values(buildings)) b.rooms.sort((x, y) => String(x.r).localeCompare(String(y.r), 'ja', {numeric: true}));
   }
+  // 駐車場の区画が「物件」として空室一覧に入っているもの（例：長崎江川駐車場 P-07、林田ガレージ 3）を除く
+  const isParkingLot = v => /駐車場|ガレージ|パーキング|月極/.test(String(v.p || '').normalize('NFKC')) || /^p[-‐－]?\d+$/i.test(String(v.r || '').normalize('NFKC').trim());
   // 優先度：未巡回 → 巡回から日が経っている順 → 空室期間が長い順
   const priority = b => (b.lastPatrol ? dayNum(today) - dayNum(b.lastPatrol) : 1e13) + (b.maxDays || 0);
 
@@ -98,10 +102,19 @@
         ${addrs.length ? `<a class="secondary-button no-print" style="text-align:center;text-decoration:none" href="${esc(routeUrl(addrs))}" target="_blank" rel="noopener noreferrer">この班のルートをGoogleマップで開く（${addrs.length}か所）</a>` : ''}
         ${list.map((b, bi) => `<div class="jk-prop"><div class="top"><b>${bi + 1}. ${esc(b.p)}</b><button type="button" class="x no-print" data-g="${gi}" data-rm="${esc(b.key)}">外す</button></div>
           <div class="meta">${b.missing ? '※現在の空室一覧にありません（入居済みなど）' : `${esc(addressOf(b) || '住所未登録')}　｜　前回巡回 ${b.lastPatrol ? esc(b.lastPatrol) : '未巡回あり'}${b.maxDays != null ? `　｜　空室 最長${b.maxDays}日` : ''}`}</div>
+          <div class="jk-park">🅿 駐車場区画：<span class="jk-park-text">${esc(parking[b.key] || '未登録')}</span> <button type="button" class="link-btn no-print" data-park="${esc(b.key)}">${parking[b.key] ? '変更' : '登録'}</button></div>
           <div class="jk-rooms">${b.rooms.map(r => `<a class="${r.last && r.last >= date ? 'done' : ''} ${r.soon ? 'soon' : ''}" href="room.html?id=${encodeURIComponent(r.id)}" title="${r.soon ? '退去予定' : '空室中'}">${esc(r.r || '号室なし')}${r.soon ? '（退去予定）' : ''}${r.last && r.last >= date ? ' ✓' : ''}</a>`).join('')}</div></div>`).join('')}
         <div class="jk-add no-print"><select data-addsel="${gi}"><option value="">＋ 物件を追加（${esc(areasOf(g).join('・') || 'エリア未設定')}の未割り当て ${spare.length}件）</option>${spare.map(b => `<option value="${esc(b.key)}">${esc(b.p)}（${b.rooms.length}部屋・${b.lastPatrol ? '前回' + b.lastPatrol : '未巡回あり'}）</option>`).join('')}</select></div>
       </details>`;
     }).join('') || '<p class="empty">班を追加してください</p>';
+    $('jk-cards').querySelectorAll('[data-park]').forEach(btn => btn.addEventListener('click', async () => {
+      const key = btn.dataset.park, name = key.split('|')[0];
+      const text = window.prompt(`「${buildings[key] ? buildings[key].p : name}」の駐車場区画（例：敷地内 3番、来客用P、前面道路は不可）\n空欄で保存すると削除します`, parking[key] || '');
+      if (text === null) return;
+      btn.disabled = true; say('駐車場区画を保存しています…');
+      try { parking = (await Api.setParking({key, text})).parking || parking; renderCards(); say('駐車場区画を保存しました（全員に共有）'); }
+      catch (e) { say('保存できませんでした：' + e.message, true); btn.disabled = false; }
+    }));
     $('jk-cards').querySelectorAll('details.jk-card').forEach(d => d.addEventListener('toggle', () => { const i = Number(d.dataset.gi); if (d.open) openCards.add(i); else openCards.delete(i); }));
     $('jk-cards').querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => { const g = groups[Number(b.dataset.g)]; g.props = g.props.filter(k => k !== b.dataset.rm); renderCards(); }));
     $('jk-cards').querySelectorAll('[data-addsel]').forEach(s => s.addEventListener('change', () => { if (!s.value) return; groups[Number(s.dataset.addsel)].props.push(s.value); renderCards(); }));
@@ -151,6 +164,7 @@
       buildIndex();
       $('notice').textContent = `空室中・退去予定：${Object.keys(buildings).length}物件（${Object.values(buildings).reduce((n, b) => n + b.rooms.length, 0)}部屋）。巡回の記録は、各部屋のボタンから従来どおり行います（巡回日以降に記録した部屋に ✓ が付きます）。`;
       $('notice').className = 'notice subtle';
+      try { parking = (await Api.parking()).parking || {}; } catch (e) { parking = {}; }
       const r = await loadPast();
       if (r && r.plan && r.plan.date >= today) applyPlan(r.plan); // これからの巡回日の班分けがあれば表示
       else { $('jk-date').value = today; groups = [{name: 'A班', member: '', area: '長崎中央', area2: NONE, count: 7}, {name: 'B班', member: '', area: '長崎北', area2: NONE, count: 7}, {name: 'C班', member: '', area: '諫早', area2: '大村', count: 7}]; renderGroupInputs(); }

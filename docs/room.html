@@ -15,10 +15,10 @@
   <script defer src="snapshot-current.js?v=20261008auth"></script>
   <script defer src="patrol-store.js?v=20261002"></script>
   <script defer src="patrol-items.js?v=20261015"></script>
-  <script defer src="api.js?v=20261011e"></script>
+  <script defer src="api.js?v=20261022b"></script>
   <script defer src="outbox.js?v=20261008auth"></script>
   <script defer src="outbox-bar.js?v=20261008auth"></script>
-  <script defer src="room.js?v=20261015"></script>
+  <script defer src="room.js?v=20261022"></script>
 </head>
 <body>
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
@@ -29,7 +29,7 @@
     <div id="room-content" hidden>
       <div class="section-heading"><div><p class="eyebrow">ROOM PATROL</p><h1 id="room-name"></h1><p class="room-subline" id="room-meta"></p></div><div class="head-actions"><span id="lp-box" class="lp-box"><button type="button" id="lp-button" class="secondary-button">物件紹介LPを作成</button><span id="lp-state" class="lp-state" role="status"></span></span><a id="report-link" class="primary-button report-button" href="#">反響レポート作成</a><a id="asana-link" target="_blank" rel="noopener noreferrer">Asanaで確認 ↗</a></div></div>
       <section class="room-location" aria-labelledby="location-title">
-        <div class="location-details"><h2 id="location-title">所在地</h2><p id="room-address"></p><p class="location-help" id="location-help"></p></div>
+        <div class="location-details"><h2 id="location-title">所在地</h2><p id="room-address"></p><p class="location-help" id="room-parking" hidden></p><p class="location-help" id="location-help"></p></div>
         <a id="route-link" class="route-button" target="_blank" rel="noopener noreferrer" hidden>Googleマップでルート検索</a>
       </section>
       <div class="two-metrics"><div class="metric-line room-metric"><span>前回巡回</span><strong id="last-patrol">未登録</strong></div><div class="metric-line room-metric"><span>次回巡回予定</span><strong id="next-patrol">未設定</strong></div></div>

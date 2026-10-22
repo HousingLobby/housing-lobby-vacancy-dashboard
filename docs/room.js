@@ -60,6 +60,8 @@
   const addressBook = data.addresses || window.HOUSING_ADDRESSES; // 住所はGASから（ログイン後のみ）
   const propertyLocation = addressBook?.properties?.[`${propertyKey}|${room.a || ''}`];
   el('room-address').textContent = propertyLocation?.address || '住所を確認中';
+  // 駐車場区画（月例巡回ページで登録したメモ）
+  api.parking().then(r => { const t = (r.parking || {})[`${propertyKey}|${room.a || ''}`]; if (t) { el('room-parking').textContent = `🅿 駐車場区画：${t}`; el('room-parking').hidden = false; } }).catch(() => {});
   el('location-help').textContent = propertyLocation?.address
     ? '車でのルートを開きます。出発地はGoogleマップで変更できます。'
     : '住所を確認でき次第、ルート検索を利用できます。';

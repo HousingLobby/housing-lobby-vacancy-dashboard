@@ -125,7 +125,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-22-patrol-pass';
+const APP_VERSION = '2026-10-22-parking';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true};
 
@@ -153,6 +153,8 @@ function handle_(action, body) {
     // 反響対応（ログイン必須）
     case 'hankyoImport': return hankyoImport_(body);
     case 'getPatrolPlan': return getPatrolPlan_(body.date);
+    case 'parking': return {parking: parkingGet_()};
+    case 'setParking': return setParking_(body);
     case 'savePatrolPlan': return savePatrolPlan_(body);
     case 'hankyoCheckRequest': return hankyoCheckRequest_();
     case 'hankyoCheckStatus': return {check: hankyoCheckGet__()};
@@ -1640,6 +1642,7 @@ function getPatrolPlan_(date) {
   if (!d) return {plan: null, dates: idx};
   const raw = PropertiesService.getScriptProperties().getProperty('PP_' + d);
   const plan = raw ? JSON.parse(raw) : null;
+  if (plan) plan.parking = parkingGet_();
   if (plan && plan.pass && plan.date < todayJst_()) { plan.pass = ''; plan.passExpired = true; }
   return {plan: plan, dates: idx};
 }
@@ -1665,4 +1668,24 @@ function savePatrolPlan_(body) {
     pr.setProperty('PP_INDEX', JSON.stringify(idx.slice(0, 12)));
   } finally { lock.releaseLock(); }
   return {ok: true, plan: plan};
+}
+
+
+/* ---------- 駐車場区画（物件ごとのメモ。巡回で停める場所など） ---------- */
+// スクリプトプロパティ PK_NOTES に {物件キー: 区画メモ}。物件キー＝物件名（空白・記号を除く）＋「|」＋地区。Asanaには書かない
+function parkingGet_() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('PK_NOTES') || '{}'); } catch (_) { return {}; } }
+
+function setParking_(body) {
+  const key = hankyoClean_(body.key, 120);
+  if (!key || key.indexOf('|') < 0) throw new Error('物件が正しくありません');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const m = parkingGet_();
+    const text = hankyoClean_(body.text, 200).trim();
+    if (text) m[key] = text; else delete m[key];
+    const json = JSON.stringify(m);
+    if (json.length > 8900) throw new Error('駐車場メモの容量がいっぱいです（文字を短くしてください）');
+    PropertiesService.getScriptProperties().setProperty('PK_NOTES', json);
+    return {ok: true, parking: m};
+  } finally { lock.releaseLock(); }
 }

@@ -85,6 +85,8 @@
     setManagement: body => request(null, {action: 'setManagement', ...body}),
     hankyoList: () => request({action: 'hankyoList'}),
     hankyoGet: id => request({action: 'hankyoGet', id}),
+    parking: () => request({action: 'parking'}),
+    setParking: body => request(null, {action: 'setParking', ...body}),
     getPatrolPlan: date => request({action: 'getPatrolPlan', ...(date ? {date} : {})}),
     savePatrolPlan: body => request(null, {action: 'savePatrolPlan', ...body}),
     hankyoImport: body => request(null, {action: 'hankyoImport', ...body}, 120000),
