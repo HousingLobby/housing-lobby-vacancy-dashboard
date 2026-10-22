@@ -103,7 +103,6 @@
         ${list.map((b, bi) => `<div class="jk-prop"><div class="top"><b>${bi + 1}. ${esc(b.p)}</b><button type="button" class="x no-print" data-g="${gi}" data-rm="${esc(b.key)}">外す</button></div>
           <div class="meta">${b.missing ? '※現在の空室一覧にありません（入居済みなど）' : `${esc(addressOf(b) || '住所未登録')}　｜　前回巡回 ${b.lastPatrol ? esc(b.lastPatrol) : '未巡回あり'}${b.maxDays != null ? `　｜　空室 最長${b.maxDays}日` : ''}`}</div>
           ${(() => { const pks = [...new Set((b.rooms || []).map(r => r.pk).filter(Boolean))]; return pks.length ? `<div class="jk-park">🅿 部屋の駐車区画（Asana）：${esc(pks.join(' ／ '))}</div>` : ''; })()}
-          <div class="jk-park">🅿 巡回時の駐車メモ：<span class="jk-park-text">${esc(parking[b.key] || '未登録')}</span> <button type="button" class="link-btn no-print" data-park="${esc(b.key)}">${parking[b.key] ? '変更' : '登録'}</button></div>
           <div class="jk-rooms">${b.rooms.map(r => `<a class="${r.last && r.last >= date ? 'done' : ''} ${r.soon ? 'soon' : ''}" href="room.html?id=${encodeURIComponent(r.id)}" title="${r.soon ? '退去予定' : '空室中'}">${esc(r.r || '号室なし')}${r.soon ? '（退去予定）' : ''}${r.last && r.last >= date ? ' ✓' : ''}</a>`).join('')}</div></div>`).join('')}
         <div class="jk-add no-print"><select data-addsel="${gi}"><option value="">＋ 物件を追加（${esc(areasOf(g).join('・') || 'エリア未設定')}の未割り当て ${spare.length}件）</option>${spare.map(b => `<option value="${esc(b.key)}">${esc(b.p)}（${b.rooms.length}部屋・${b.lastPatrol ? '前回' + b.lastPatrol : '未巡回あり'}）</option>`).join('')}</select></div>
       </details>`;
@@ -165,7 +164,6 @@
       buildIndex();
       $('notice').textContent = `空室中・退去予定：${Object.keys(buildings).length}物件（${Object.values(buildings).reduce((n, b) => n + b.rooms.length, 0)}部屋）。巡回の記録は、各部屋のボタンから従来どおり行います（巡回日以降に記録した部屋に ✓ が付きます）。`;
       $('notice').className = 'notice subtle';
-      try { parking = (await Api.parking()).parking || {}; } catch (e) { parking = {}; }
       const r = await loadPast();
       if (r && r.plan && r.plan.date >= today) applyPlan(r.plan); // これからの巡回日の班分けがあれば表示
       else { $('jk-date').value = today; groups = [{name: 'A班', member: '', area: '長崎中央', area2: NONE, count: 7}, {name: 'B班', member: '', area: '長崎北', area2: NONE, count: 7}, {name: 'C班', member: '', area: '諫早', area2: '大村', count: 7}]; renderGroupInputs(); }

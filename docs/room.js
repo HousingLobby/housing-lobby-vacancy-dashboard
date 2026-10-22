@@ -64,7 +64,6 @@
   const parkLines = room.pk ? [`🅿 部屋の駐車区画（Asana）：${room.pk}`] : [];
   const showPark = () => { if (parkLines.length) { el('room-parking').textContent = parkLines.join('　／　'); el('room-parking').hidden = false; } };
   showPark();
-  api.parking().then(r => { const t = (r.parking || {})[`${propertyKey}|${room.a || ''}`]; if (t) { parkLines.push(`巡回時の駐車メモ：${t}`); showPark(); } }).catch(() => {});
   el('location-help').textContent = propertyLocation?.address
     ? '車でのルートを開きます。出発地はGoogleマップで変更できます。'
     : '住所を確認でき次第、ルート検索を利用できます。';
