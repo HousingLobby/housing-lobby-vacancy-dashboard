@@ -22,19 +22,33 @@
   const fold = (title, preview, body) => `<details class="promo-fold"><summary><span class="promo-title">${esc(title)}</span><span class="promo-preview">${preview}</span></summary><div class="promo-body">${body}</div></details>`;
   // 「未設定」に該当するタスク（申込）を、クリックで開いて確認できるようにする
   const unsetBox = list => list && list.length ? `<details class="unset-box"><summary>「未設定」のタスクを見る（${list.length}件）</summary><ul>${list.map(x => `<li><a href="https://app.asana.com/0/${CFG_PROJECT}/${encodeURIComponent(x.gid)}" target="_blank" rel="noopener noreferrer">${esc(x.name)}</a></li>`).join('')}</ul><p class="muted">Asanaで項目を入力するか、不要なタスク（仮の作成など）はステータスを「除外」にすると、集計から外れます。</p></details>` : '';
+  // 割合は円グラフ（ドーナツ）で表す。上位7つに色を付け、残りは灰色（「その他」）
+  const COLORS = ['#1b5d85', '#e0a22b', '#2f9e74', '#c4553a', '#7a5fb0', '#3aa3c4', '#b0723a'];
+  const colorOf = i => i < COLORS.length ? COLORS[i] : '#b8c4cc';
+  const swatch = i => `<span class="pie-sw" style="background:${colorOf(i)}"></span>`;
+  const pie = (vals, total, unit) => {
+    if (!total) return '';
+    let acc = 0;
+    const segs = vals.map((v, i) => {
+      const pct = v / total * 100; if (pct <= 0) return '';
+      const seg = `<circle r="15.915" cx="21" cy="21" fill="none" stroke="${colorOf(i)}" stroke-width="7" stroke-dasharray="${pct.toFixed(3)} ${(100 - pct).toFixed(3)}" stroke-dashoffset="${(25 - acc).toFixed(3)}"></circle>`;
+      acc += pct; return seg;
+    }).join('');
+    return `<svg class="pie" viewBox="0 0 42 42" role="img" aria-label="割合の円グラフ"><circle r="15.915" cx="21" cy="21" fill="none" stroke="#eef3f6" stroke-width="7"></circle>${segs}<text x="21" y="20.5" text-anchor="middle" class="pie-num">${fmt(total)}</text><text x="21" y="26" text-anchor="middle" class="pie-unit">${unit}</text></svg>`;
+  };
   const table1 = (title, obj, unit = '件', unset = null) => {
     const rows = sortEntries(obj);
     if (!rows.length) return '';
     const total = rows.reduce((n, [, v]) => n + v, 0);
     const preview = rows.slice(0, 2).map(([k, v]) => `${esc(k)} ${fmt(v)}${unit}`).join('・') + (rows.length > 2 ? ` ほか${rows.length - 2}` : '');
-    return fold(title, preview, `<table class="mini-table"><tbody>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${fmt(v)}${unit}</td><td class="num muted">${total ? Math.round(v / total * 100) : 0}%</td><td class="bar-cell"><span style="width:${total ? Math.round(v / total * 100) : 0}%"></span></td></tr>`).join('')}</tbody></table>` + (obj['未設定'] ? (unset ? unsetBox(unset) : '<p class="muted unset-note">「最新に更新」を押すと、未設定のタスク名を確認できます</p>') : ''));
+    return fold(title, preview, `<div class="promo-chart">${pie(rows.map(([, v]) => v), total, unit)}<table class="mini-table"><tbody>${rows.map(([k, v], i) => `<tr><td>${swatch(i)}${esc(k)}</td><td class="num">${fmt(v)}${unit}</td><td class="num muted">${total ? Math.round(v / total * 100) : 0}%</td></tr>`).join('')}</tbody></table></div>` + (obj['未設定'] ? (unset ? unsetBox(unset) : '<p class="muted unset-note">「最新に更新」を押すと、未設定のタスク名を確認できます</p>') : ''));
   };
   const table2 = (title, obj) => {
     const rows = sortEntries(obj);
     if (!rows.length) return '';
     const total = rows.reduce((n, [, v]) => n + v.people, 0);
     const preview = rows.slice(0, 2).map(([k, v]) => `${esc(k)} ${fmt(v.people)}人`).join('・') + (rows.length > 2 ? ` ほか${rows.length - 2}` : '');
-    return fold(title, preview, `<table class="mini-table"><thead><tr><th></th><th class="num">人数</th><th class="num">物件ごと</th><th class="num">割合</th><th></th></tr></thead><tbody>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${fmt(v.people)}</td><td class="num">${fmt(v.properties)}</td><td class="num muted">${total ? Math.round(v.people / total * 100) : 0}%</td><td class="bar-cell"><span style="width:${total ? Math.round(v.people / total * 100) : 0}%"></span></td></tr>`).join('')}</tbody></table>`);
+    return fold(title, preview, `<div class="promo-chart">${pie(rows.map(([, v]) => v.people), total, '人')}<table class="mini-table"><thead><tr><th></th><th class="num">人数</th><th class="num">物件ごと</th><th class="num">割合</th></tr></thead><tbody>${rows.map(([k, v], i) => `<tr><td>${swatch(i)}${esc(k)}</td><td class="num">${fmt(v.people)}</td><td class="num">${fmt(v.properties)}</td><td class="num muted">${total ? Math.round(v.people / total * 100) : 0}%</td></tr>`).join('')}</tbody></table></div>`);
   };
 
   const render = async (month, refresh) => {

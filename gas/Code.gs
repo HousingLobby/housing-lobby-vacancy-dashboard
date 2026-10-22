@@ -61,7 +61,7 @@ const CFG = {
     {key: 'roomCleaning', name: '室内清掃', ok: '済', ng: '要清掃', task: '室内清掃'},
     {key: 'commonCleaning', name: '共用部清掃', ok: '済', ng: '要清掃', task: '共用部清掃'},
     {key: 'postSeal', name: 'ポストシール', ok: 'あり', ng: 'なし', task: 'ポストシールを貼付'},
-    {key: 'colorCone', name: 'カラーコーン', ok: 'あり', ng: 'なし', task: 'カラーコーンを設置'},
+    {key: 'colorCone', name: 'カラーコーン', ok: 'あり', ng: 'なし', na: '駐車場なし', task: 'カラーコーンを設置'},
     {key: 'airFreshener', name: '芳香剤補充', ok: '済', ng: '要補充', task: '芳香剤を補充'},
     {key: 'tatamiMold', name: '畳カビ確認', ok: '問題なし', ng: 'カビあり', na: '該当なし', task: '畳カビ対応'},
     {key: 'keyBattery', name: '電子キー電池確認', ok: '問題なし', ng: '要交換', na: '該当なし', task: '電子キー電池交換'}
@@ -126,7 +126,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-22-parking-asana';
+const APP_VERSION = '2026-10-22-colorcone-na';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true};
 

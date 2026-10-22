@@ -63,3 +63,5 @@ body.auth-wait main,body.auth-wait .outbox-bar{visibility:hidden}
 .tab-link{justify-content:center;text-align:center}
 @media(max-width:620px){.nav-menu>summary{width:100%;min-width:0}.nav-menu>nav.tabs{right:0;min-width:0}.nav-menu>nav.tabs .tab{padding:11px 8px;font-size:.95rem}}
 @media print{.nav-menu{display:none}}
+.promo-chart{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.promo-chart .mini-table{flex:1;min-width:220px}.pie{width:120px;height:120px;flex:0 0 120px;transform:rotate(0deg)}.pie-num{font-size:7px;font-weight:800;fill:#13262d}.pie-unit{font-size:3.4px;fill:#6a7f8e}.pie-sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+@media(max-width:620px){.pie{width:96px;height:96px;flex-basis:96px}}
