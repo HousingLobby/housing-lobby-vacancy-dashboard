@@ -49,3 +49,17 @@ body.auth-wait main,body.auth-wait .outbox-bar{visibility:hidden}
 @media(max-width:800px){.hk-detail{grid-template-columns:1fr}}
 .hk-last{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
 .unset-box{margin:6px 0 10px;font-size:.84rem}.unset-box summary{cursor:pointer;color:#9b5a19;font-weight:800}.unset-box ul{margin:6px 0;padding-left:1.2em}.unset-box .muted,.unset-note{color:#6a7f8e;font-size:.78rem}
+
+/* ページ切り替えのプルダウン（2026-10-22） */
+.nav-menu{position:relative;margin:0 0 18px}
+.nav-menu>summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;border:1px solid #d3dee5;background:#fff;border-radius:10px;padding:10px 16px;min-height:46px;font-weight:800;color:#1b5d85;width:fit-content;min-width:240px}
+.nav-menu>summary::-webkit-details-marker{display:none}
+.nav-menu .nav-label{font-size:.76rem;color:#617688;font-weight:700}
+.nav-menu .nav-current{flex:1}
+.nav-menu .nav-caret{font-size:.7rem;transition:transform .15s}
+.nav-menu[open] .nav-caret{transform:rotate(180deg)}
+.nav-menu>nav.tabs{position:absolute;z-index:20;top:calc(100% + 6px);left:0;display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #d3dee5;border-radius:12px;padding:10px;box-shadow:0 10px 30px rgba(22,50,71,.15);min-width:240px;margin:0}
+.nav-menu>nav.tabs .tab{width:100%;text-align:center;justify-content:center}
+.tab-link{justify-content:center;text-align:center}
+@media(max-width:620px){.nav-menu>summary{width:100%;min-width:0}.nav-menu>nav.tabs{right:0;min-width:0}.nav-menu>nav.tabs .tab{padding:11px 8px;font-size:.95rem}}
+@media print{.nav-menu{display:none}}

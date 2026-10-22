@@ -116,7 +116,7 @@
     try {
       const body = {date, groups: groups.map(g => ({name: g.name, member: g.member, area: g.area, props: (g.props || []).map(k => { const b = buildings[k] || {p: k.split('|')[0], a: k.split('|')[1], rooms: []}; return {key: k, p: b.p, a: b.a, rooms: b.rooms.map(r => r.id)}; })}))};
       const r = await Api.savePatrolPlan(body);
-      plan = r.plan; showSaved(); say('保存しました。このページを開けば、全員が同じ班分けを見られます');
+      plan = r.plan; showSaved(); $('setup').open = false; summarizeSetup(); say('保存しました。このページを開けば、全員が同じ班分けを見られます');
       loadPast(date);
     } catch (e) { say('保存できませんでした：' + e.message, true); }
     $('jk-save').disabled = false;
@@ -128,7 +128,10 @@
     // 保存後に空室一覧から外れた建物も、名前だけは表示できるようにする
     p.groups.forEach(g => g.props.forEach(x => { if (!buildings[x.key]) buildings[x.key] = {key: x.key, p: x.p, a: x.a, rooms: [], missing: true}; }));
     renderGroupInputs(); renderCards(); showSaved();
+    // 保存済みの班分けを開いたときは、入力欄をたたんで班ごとの表を見やすくする
+    $('setup').open = false; summarizeSetup();
   }
+  function summarizeSetup() { $('setup-sum').textContent = `${$('jk-date').value || ''}　${groups.map(g => `${g.name}（${g.area}）`).join('・')}　— 押すと開きます`; }
   async function loadPast(selected) {
     try {
       const r = await Api.getPatrolPlan();
