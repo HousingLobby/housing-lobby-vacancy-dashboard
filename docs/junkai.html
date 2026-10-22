@@ -10,7 +10,7 @@
   <style>
     .jk-setup>summary{list-style:none;cursor:pointer;margin-bottom:0;flex-wrap:wrap}.jk-setup>summary h2{white-space:nowrap}.jk-setup>summary::-webkit-details-marker{display:none}.jk-setup[open]>summary{margin-bottom:17px}.jk-caret{font-size:.7rem;color:#1b5d85;display:inline-block;transition:transform .15s}.jk-setup[open] .jk-caret{transform:rotate(180deg)}
     .jk-groups{display:flex;flex-direction:column;gap:8px}
-    .jk-g{display:grid;grid-template-columns:1fr 1.4fr 1fr 90px auto;gap:8px;align-items:end}
+    .jk-g{display:grid;grid-template-columns:1fr 1.3fr 1fr 1fr 80px auto;gap:8px;align-items:end}
     .jk-g label{display:flex;flex-direction:column;gap:4px;font-size:.78rem;font-weight:800;color:#536b7d}
     .jk-g input,.jk-g select{border:1px solid #cbd9e2;border-radius:8px;padding:9px 10px;font-size:.9rem;min-height:42px;background:#fff}
     .jk-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
@@ -35,7 +35,7 @@
   <script defer src="snapshot-current.js?v=20261008auth"></script>
   <script defer src="api.js?v=20261022"></script>
   <script defer src="nav.js?v=20261022"></script>
-  <script defer src="junkai.js?v=20261022b"></script>
+  <script defer src="junkai.js?v=20261022c"></script>
 </head>
 <body data-page="junkai">
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
@@ -49,7 +49,7 @@
       <div class="filters"><label>巡回日<input type="date" id="jk-date"></label><label>過去の班分け<select id="jk-past"><option value="">（新規）</option></select></label></div>
       <div class="jk-groups" id="jk-groups"></div>
       <div class="button-row" style="margin-top:12px"><button type="button" class="secondary-button" id="jk-addg">＋ 班を追加</button><button type="button" class="primary-button" id="jk-make">② 振り分け案を作る</button></div>
-      <p class="footnote" style="margin:8px 0 0">対象：空室中と退去予定の部屋。同じ建物の部屋は1物件にまとめます。巡回から日が経っている物件（未巡回を含む）、空室期間が長い物件を優先して選びます。同じエリアに班が複数あるときは、交互に振り分けます。</p>
+      <p class="footnote" style="margin:8px 0 0">対象：空室中と退去予定の部屋。同じ建物の部屋は1物件にまとめます。巡回から日が経っている物件（未巡回を含む）、空室期間が長い物件を優先して選びます。班ごとに担当エリアを2つまで選べます（なしは「ー」）。同じエリアを担当する班が複数あるときは、割り当てが少ない班から順に振り分けます。</p>
     </details>
 
     <div class="button-row no-print" style="margin:14px 0"><button type="button" class="primary-button" id="jk-save" hidden>③ 保存して全員に共有</button><button type="button" class="secondary-button" id="jk-print" hidden>班ごとの表を印刷・PDF</button><span class="save-message" id="jk-msg" role="status"></span></div>

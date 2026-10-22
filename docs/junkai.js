@@ -9,6 +9,9 @@
   const dayNum = s => Date.parse(s + 'T00:00:00Z');
   const keyOf = (p, a) => String(p || '').normalize('NFKC').replace(/[\s・･.．\-‐‑–—－_（）()]+/g, '').toLowerCase() + '|' + (a || '');
   let data = null, buildings = {}, groups = [], plan = null;
+  const NONE = 'ー';
+  // 班の担当エリア（最大2つ。「ー」はなし）
+  const areasOf = g => [...new Set([g.area, g.area2].filter(a => a && a !== NONE))];
 
   // 空室中・退去予定の部屋を、建物（物件名＋地区）ごとにまとめる
   function buildIndex() {
@@ -38,7 +41,8 @@
     return `<div class="jk-g" data-i="${i}">
       <label>班の名前<input data-f="name" value="${esc(g.name)}" placeholder="例：A班"></label>
       <label>担当者（任意）<input data-f="member" value="${esc(g.member)}" placeholder="例：細田・本多"></label>
-      <label>エリア<select data-f="area">${AREAS.map(a => `<option${a === g.area ? ' selected' : ''}>${a}</option>`).join('')}</select></label>
+      <label>エリア1<select data-f="area">${[NONE, ...AREAS].map(a => `<option${a === (g.area || NONE) ? ' selected' : ''}>${a}</option>`).join('')}</select></label>
+      <label>エリア2<select data-f="area2">${[NONE, ...AREAS].map(a => `<option${a === (g.area2 || NONE) ? ' selected' : ''}>${a}</option>`).join('')}</select></label>
       <label>物件数<input data-f="count" type="number" min="1" max="20" value="${g.count || 7}"></label>
       <button type="button" class="x" data-del="${i}">削除</button></div>`;
   }
@@ -54,19 +58,14 @@
 
   // ---------- 振り分け ----------
   function makePlan() {
-    const used = new Set();
     groups.forEach(g => { g.props = []; });
-    for (const area of AREAS) {
-      const gs = groups.filter(g => g.area === area);
-      if (!gs.length) continue;
-      const cand = Object.values(buildings).filter(b => b.a === area).sort((x, y) => priority(y) - priority(x));
-      let turn = 0;
-      for (const b of cand) {
-        const open = gs.filter(g => g.props.length < (g.count || 7));
-        if (!open.length) break;
-        const g = open[turn % open.length]; turn++;
-        g.props.push(b.key); used.add(b.key);
-      }
+    // 優先度の高い建物から順に、そのエリアを担当する班のうち、まだ枠が空いていて割り当てが少ない班へ入れる
+    const cand = Object.values(buildings).sort((x, y) => priority(y) - priority(x));
+    for (const b of cand) {
+      const open = groups.filter(g => areasOf(g).includes(b.a) && g.props.length < (g.count || 7));
+      if (!open.length) continue;
+      open.sort((x, y) => x.props.length / (x.count || 7) - y.props.length / (y.count || 7));
+      open[0].props.push(b.key);
     }
     plan = {date: $('jk-date').value};
     renderCards();
@@ -91,15 +90,15 @@
       const rooms = list.flatMap(b => b.rooms);
       const done = rooms.filter(r => r.last && r.last >= date).length;
       const addrs = list.map(addressOf).filter(Boolean);
-      const spare = Object.values(buildings).filter(b => b.a === g.area && !assigned.has(b.key)).sort((x, y) => priority(y) - priority(x));
+      const spare = Object.values(buildings).filter(b => areasOf(g).includes(b.a) && !assigned.has(b.key)).sort((x, y) => priority(y) - priority(x));
       return `<div class="jk-card">
-        <div><h2>${esc(g.name || '班')}　<span style="font-size:.85rem;color:#617688">${esc(g.area)}</span></h2><div class="sub">${esc(g.member || '担当者未設定')}　｜　${list.length}物件・${rooms.length}部屋　｜　巡回済み ${done}/${rooms.length}</div></div>
+        <div><h2>${esc(g.name || '班')}　<span style="font-size:.85rem;color:#617688">${esc(areasOf(g).join('・') || 'エリアなし')}</span></h2><div class="sub">${esc(g.member || '担当者未設定')}　｜　${list.length}物件・${rooms.length}部屋　｜　巡回済み ${done}/${rooms.length}</div></div>
         <div class="jk-progress"><i style="width:${rooms.length ? Math.round(done / rooms.length * 100) : 0}%"></i></div>
         ${addrs.length ? `<a class="secondary-button no-print" style="text-align:center;text-decoration:none" href="${esc(routeUrl(addrs))}" target="_blank" rel="noopener noreferrer">この班のルートをGoogleマップで開く（${addrs.length}か所）</a>` : ''}
         ${list.map((b, bi) => `<div class="jk-prop"><div class="top"><b>${bi + 1}. ${esc(b.p)}</b><button type="button" class="x no-print" data-g="${gi}" data-rm="${esc(b.key)}">外す</button></div>
           <div class="meta">${b.missing ? '※現在の空室一覧にありません（入居済みなど）' : `${esc(addressOf(b) || '住所未登録')}　｜　前回巡回 ${b.lastPatrol ? esc(b.lastPatrol) : '未巡回あり'}${b.maxDays != null ? `　｜　空室 最長${b.maxDays}日` : ''}`}</div>
           <div class="jk-rooms">${b.rooms.map(r => `<a class="${r.last && r.last >= date ? 'done' : ''} ${r.soon ? 'soon' : ''}" href="room.html?id=${encodeURIComponent(r.id)}" title="${r.soon ? '退去予定' : '空室中'}">${esc(r.r || '号室なし')}${r.soon ? '（退去予定）' : ''}${r.last && r.last >= date ? ' ✓' : ''}</a>`).join('')}</div></div>`).join('')}
-        <div class="jk-add no-print"><select data-addsel="${gi}"><option value="">＋ 物件を追加（${esc(g.area)}の未割り当て ${spare.length}件）</option>${spare.map(b => `<option value="${esc(b.key)}">${esc(b.p)}（${b.rooms.length}部屋・${b.lastPatrol ? '前回' + b.lastPatrol : '未巡回あり'}）</option>`).join('')}</select></div>
+        <div class="jk-add no-print"><select data-addsel="${gi}"><option value="">＋ 物件を追加（${esc(areasOf(g).join('・') || 'エリア未設定')}の未割り当て ${spare.length}件）</option>${spare.map(b => `<option value="${esc(b.key)}">${esc(b.p)}（${b.rooms.length}部屋・${b.lastPatrol ? '前回' + b.lastPatrol : '未巡回あり'}）</option>`).join('')}</select></div>
       </div>`;
     }).join('') || '<p class="empty">班を追加してください</p>';
     $('jk-cards').querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => { const g = groups[Number(b.dataset.g)]; g.props = g.props.filter(k => k !== b.dataset.rm); renderCards(); }));
@@ -114,7 +113,7 @@
     if (!date) { say('巡回日を入れてください', true); return; }
     $('jk-save').disabled = true; say('保存しています…');
     try {
-      const body = {date, groups: groups.map(g => ({name: g.name, member: g.member, area: g.area, props: (g.props || []).map(k => { const b = buildings[k] || {p: k.split('|')[0], a: k.split('|')[1], rooms: []}; return {key: k, p: b.p, a: b.a, rooms: b.rooms.map(r => r.id)}; })}))};
+      const body = {date, groups: groups.map(g => ({name: g.name, member: g.member, area: areasOf(g).join('・'), props: (g.props || []).map(k => { const b = buildings[k] || {p: k.split('|')[0], a: k.split('|')[1], rooms: []}; return {key: k, p: b.p, a: b.a, rooms: b.rooms.map(r => r.id)}; })}))};
       const r = await Api.savePatrolPlan(body);
       plan = r.plan; showSaved(); $('setup').open = false; summarizeSetup(); say('保存しました。このページを開けば、全員が同じ班分けを見られます');
       loadPast(date);
@@ -124,14 +123,14 @@
   function showSaved() { $('saved-note').textContent = plan && plan.savedAt ? `保存済み：${plan.date}の班分け（${new Date(plan.savedAt).toLocaleString('ja-JP')}${plan.by ? '・' + plan.by : ''}）` : ''; }
   function applyPlan(p) {
     plan = p; $('jk-date').value = p.date;
-    groups = p.groups.map(g => ({name: g.name, member: g.member, area: g.area, count: Math.max(7, g.props.length), props: g.props.map(x => x.key)}));
+    groups = p.groups.map(g => ({name: g.name, member: g.member, area: (g.area || '').split('・')[0] || NONE, area2: (g.area || '').split('・')[1] || NONE, count: Math.max(7, g.props.length), props: g.props.map(x => x.key)}));
     // 保存後に空室一覧から外れた建物も、名前だけは表示できるようにする
     p.groups.forEach(g => g.props.forEach(x => { if (!buildings[x.key]) buildings[x.key] = {key: x.key, p: x.p, a: x.a, rooms: [], missing: true}; }));
     renderGroupInputs(); renderCards(); showSaved();
     // 保存済みの班分けを開いたときは、入力欄をたたんで班ごとの表を見やすくする
     $('setup').open = false; summarizeSetup();
   }
-  function summarizeSetup() { $('setup-sum').textContent = `${$('jk-date').value || ''}　${groups.map(g => `${g.name}（${g.area}）`).join('・')}　— 押すと開きます`; }
+  function summarizeSetup() { $('setup-sum').textContent = `${$('jk-date').value || ''}　${groups.map(g => `${g.name}（${areasOf(g).join('・') || 'エリアなし'}）`).join('、')}　— 押すと開きます`; }
   async function loadPast(selected) {
     try {
       const r = await Api.getPatrolPlan();
@@ -150,9 +149,9 @@
       $('notice').className = 'notice subtle';
       const r = await loadPast();
       if (r && r.plan && r.plan.date >= today) applyPlan(r.plan); // これからの巡回日の班分けがあれば表示
-      else { $('jk-date').value = today; groups = [{name: 'A班', member: '', area: '長崎中央', count: 7}, {name: 'B班', member: '', area: '長崎北', count: 7}, {name: 'C班', member: '', area: '諫早', count: 7}]; renderGroupInputs(); }
+      else { $('jk-date').value = today; groups = [{name: 'A班', member: '', area: '長崎中央', area2: NONE, count: 7}, {name: 'B班', member: '', area: '長崎北', area2: NONE, count: 7}, {name: 'C班', member: '', area: '諫早', area2: '大村', count: 7}]; renderGroupInputs(); }
     } catch (e) { $('notice').textContent = '読み込めませんでした：' + e.message; }
-    $('jk-addg').addEventListener('click', () => { groups.push({name: `${String.fromCharCode(65 + groups.length)}班`, member: '', area: '長崎中央', count: 7, props: []}); renderGroupInputs(); if (plan) renderCards(); });
+    $('jk-addg').addEventListener('click', () => { groups.push({name: `${String.fromCharCode(65 + groups.length)}班`, member: '', area: '長崎中央', area2: NONE, count: 7, props: []}); renderGroupInputs(); if (plan) renderCards(); });
     $('jk-make').addEventListener('click', () => { if (!groups.length) { say('班を追加してください', true); return; } makePlan(); });
     $('jk-save').addEventListener('click', save);
     $('jk-print').addEventListener('click', () => window.print());
