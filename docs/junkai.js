@@ -9,6 +9,7 @@
   const dayNum = s => Date.parse(s + 'T00:00:00Z');
   const keyOf = (p, a) => String(p || '').normalize('NFKC').replace(/[\s・･.．\-‐‑–—－_（）()]+/g, '').toLowerCase() + '|' + (a || '');
   let data = null, buildings = {}, groups = [], plan = null;
+  const openCards = new Set(); // 開いている班の表（番号）
   const NONE = 'ー';
   // 班の担当エリア（最大2つ。「ー」はなし）
   const areasOf = g => [...new Set([g.area, g.area2].filter(a => a && a !== NONE))];
@@ -91,16 +92,17 @@
       const done = rooms.filter(r => r.last && r.last >= date).length;
       const addrs = list.map(addressOf).filter(Boolean);
       const spare = Object.values(buildings).filter(b => areasOf(g).includes(b.a) && !assigned.has(b.key)).sort((x, y) => priority(y) - priority(x));
-      return `<div class="jk-card">
-        <div><h2>${esc(g.name || '班')}　<span style="font-size:.85rem;color:#617688">${esc(areasOf(g).join('・') || 'エリアなし')}</span></h2><div class="sub">${esc(g.member || '担当者未設定')}　｜　${list.length}物件・${rooms.length}部屋　｜　巡回済み ${done}/${rooms.length}</div></div>
-        <div class="jk-progress"><i style="width:${rooms.length ? Math.round(done / rooms.length * 100) : 0}%"></i></div>
+      return `<details class="jk-card" data-gi="${gi}"${openCards.has(gi) ? ' open' : ''}>
+        <summary><div class="jk-sumrow"><h2>${esc(g.name || '班')}　<span style="font-size:.85rem;color:#617688">${esc(areasOf(g).join('・') || 'エリアなし')}</span></h2><span class="jk-caret">▼</span></div><div class="sub">${esc(g.member || '担当者未設定')}　｜　${list.length}物件・${rooms.length}部屋　｜　巡回済み ${done}/${rooms.length}</div>
+        <div class="jk-progress"><i style="width:${rooms.length ? Math.round(done / rooms.length * 100) : 0}%"></i></div></summary>
         ${addrs.length ? `<a class="secondary-button no-print" style="text-align:center;text-decoration:none" href="${esc(routeUrl(addrs))}" target="_blank" rel="noopener noreferrer">この班のルートをGoogleマップで開く（${addrs.length}か所）</a>` : ''}
         ${list.map((b, bi) => `<div class="jk-prop"><div class="top"><b>${bi + 1}. ${esc(b.p)}</b><button type="button" class="x no-print" data-g="${gi}" data-rm="${esc(b.key)}">外す</button></div>
           <div class="meta">${b.missing ? '※現在の空室一覧にありません（入居済みなど）' : `${esc(addressOf(b) || '住所未登録')}　｜　前回巡回 ${b.lastPatrol ? esc(b.lastPatrol) : '未巡回あり'}${b.maxDays != null ? `　｜　空室 最長${b.maxDays}日` : ''}`}</div>
           <div class="jk-rooms">${b.rooms.map(r => `<a class="${r.last && r.last >= date ? 'done' : ''} ${r.soon ? 'soon' : ''}" href="room.html?id=${encodeURIComponent(r.id)}" title="${r.soon ? '退去予定' : '空室中'}">${esc(r.r || '号室なし')}${r.soon ? '（退去予定）' : ''}${r.last && r.last >= date ? ' ✓' : ''}</a>`).join('')}</div></div>`).join('')}
         <div class="jk-add no-print"><select data-addsel="${gi}"><option value="">＋ 物件を追加（${esc(areasOf(g).join('・') || 'エリア未設定')}の未割り当て ${spare.length}件）</option>${spare.map(b => `<option value="${esc(b.key)}">${esc(b.p)}（${b.rooms.length}部屋・${b.lastPatrol ? '前回' + b.lastPatrol : '未巡回あり'}）</option>`).join('')}</select></div>
-      </div>`;
+      </details>`;
     }).join('') || '<p class="empty">班を追加してください</p>';
+    $('jk-cards').querySelectorAll('details.jk-card').forEach(d => d.addEventListener('toggle', () => { const i = Number(d.dataset.gi); if (d.open) openCards.add(i); else openCards.delete(i); }));
     $('jk-cards').querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => { const g = groups[Number(b.dataset.g)]; g.props = g.props.filter(k => k !== b.dataset.rm); renderCards(); }));
     $('jk-cards').querySelectorAll('[data-addsel]').forEach(s => s.addEventListener('change', () => { if (!s.value) return; groups[Number(s.dataset.addsel)].props.push(s.value); renderCards(); }));
     $('jk-save').hidden = !groups.length; $('jk-print').hidden = !groups.length;
@@ -154,7 +156,12 @@
     $('jk-addg').addEventListener('click', () => { groups.push({name: `${String.fromCharCode(65 + groups.length)}班`, member: '', area: '長崎中央', area2: NONE, count: 7, props: []}); renderGroupInputs(); if (plan) renderCards(); });
     $('jk-make').addEventListener('click', () => { if (!groups.length) { say('班を追加してください', true); return; } makePlan(); });
     $('jk-save').addEventListener('click', save);
-    $('jk-print').addEventListener('click', () => window.print());
+    $('jk-print').addEventListener('click', () => {
+      const cards = [...document.querySelectorAll('details.jk-card')], was = cards.map(d => d.open);
+      cards.forEach(d => { d.open = true; });
+      window.print();
+      cards.forEach((d, i) => { d.open = was[i]; });
+    });
     $('jk-date').addEventListener('change', () => { if (plan) renderCards(); });
     $('jk-past').addEventListener('change', async () => {
       const d = $('jk-past').value;

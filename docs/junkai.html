@@ -13,8 +13,9 @@
     .jk-g{display:grid;grid-template-columns:1fr 1.3fr 1fr 1fr 80px auto;gap:8px;align-items:end}
     .jk-g label{display:flex;flex-direction:column;gap:4px;font-size:.78rem;font-weight:800;color:#536b7d}
     .jk-g input,.jk-g select{border:1px solid #cbd9e2;border-radius:8px;padding:9px 10px;font-size:.9rem;min-height:42px;background:#fff}
-    .jk-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+    .jk-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;align-items:start}
     .jk-card{background:#fff;border:1px solid #dfe8ee;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;break-inside:avoid}
+    .jk-card>summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:6px}.jk-card>summary::-webkit-details-marker{display:none}.jk-sumrow{display:flex;justify-content:space-between;align-items:center;gap:8px}.jk-card[open] .jk-caret{transform:rotate(180deg)}.jk-card[open]>summary{padding-bottom:4px}
     .jk-card h2{margin:0;font-size:1.15rem}.jk-card .sub{color:#617688;font-size:.82rem}
     .jk-prop{border-top:1px solid #e9eff2;padding:8px 0;display:flex;flex-direction:column;gap:3px}
     .jk-prop .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
@@ -26,7 +27,8 @@
     .x{border:0;background:none;color:#a3401f;font-size:.8rem;cursor:pointer}
     .jk-add{display:flex;gap:6px}.jk-add select{flex:1;border:1px solid #cbd9e2;border-radius:8px;padding:6px 8px;font-size:.84rem}
     .jk-progress{height:8px;background:#e9eff3;border-radius:9px;overflow:hidden}.jk-progress i{display:block;height:100%;background:#23845c}
-    @media(max-width:700px){.jk-g{grid-template-columns:1fr 1fr}}
+    @media(max-width:1000px){.jk-g{grid-template-columns:1fr 1fr 1fr}.jk-g{border-bottom:1px solid #e9eff2;padding-bottom:8px}}
+    @media(max-width:600px){.jk-g{grid-template-columns:1fr 1fr}}
     @media print{.masthead,.no-print,.back-link{display:none!important}.shell{padding:0}.jk-cards{grid-template-columns:1fr 1fr}.jk-card{border-color:#999}.jk-add,.x{display:none!important}}
   </style>
   <script defer src="vendor/msal-browser-2.38.3.min.js"></script>
@@ -35,7 +37,7 @@
   <script defer src="snapshot-current.js?v=20261008auth"></script>
   <script defer src="api.js?v=20261022"></script>
   <script defer src="nav.js?v=20261022"></script>
-  <script defer src="junkai.js?v=20261022c"></script>
+  <script defer src="junkai.js?v=20261022d"></script>
 </head>
 <body data-page="junkai">
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
