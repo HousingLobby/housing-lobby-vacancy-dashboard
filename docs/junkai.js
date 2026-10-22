@@ -115,7 +115,7 @@
     if (!date) { say('巡回日を入れてください', true); return; }
     $('jk-save').disabled = true; say('保存しています…');
     try {
-      const body = {date, groups: groups.map(g => ({name: g.name, member: g.member, area: areasOf(g).join('・'), props: (g.props || []).map(k => { const b = buildings[k] || {p: k.split('|')[0], a: k.split('|')[1], rooms: []}; return {key: k, p: b.p, a: b.a, rooms: b.rooms.map(r => r.id)}; })}))};
+      const body = {date, pass: $('jk-pass').value, groups: groups.map(g => ({name: g.name, member: g.member, area: areasOf(g).join('・'), props: (g.props || []).map(k => { const b = buildings[k] || {p: k.split('|')[0], a: k.split('|')[1], rooms: []}; return {key: k, p: b.p, a: b.a, rooms: b.rooms.map(r => r.id)}; })}))};
       const r = await Api.savePatrolPlan(body);
       plan = r.plan; showSaved(); $('setup').open = false; summarizeSetup(); say('保存しました。このページを開けば、全員が同じ班分けを見られます');
       loadPast(date);
@@ -125,6 +125,8 @@
   function showSaved() { $('saved-note').textContent = plan && plan.savedAt ? `保存済み：${plan.date}の班分け（${new Date(plan.savedAt).toLocaleString('ja-JP')}${plan.by ? '・' + plan.by : ''}）` : ''; }
   function applyPlan(p) {
     plan = p; $('jk-date').value = p.date;
+    $('jk-pass').value = p.pass || '';
+    $('jk-pass-note').textContent = p.passExpired ? '巡回日を過ぎたため、ワンデイパスは表示していません。' : '社内アカウントの人だけが見られます。巡回日の翌日からは表示されません。';
     groups = p.groups.map(g => ({name: g.name, member: g.member, area: (g.area || '').split('・')[0] || NONE, area2: (g.area || '').split('・')[1] || NONE, count: Math.max(7, g.props.length), props: g.props.map(x => x.key)}));
     // 保存後に空室一覧から外れた建物も、名前だけは表示できるようにする
     p.groups.forEach(g => g.props.forEach(x => { if (!buildings[x.key]) buildings[x.key] = {key: x.key, p: x.p, a: x.a, rooms: [], missing: true}; }));
@@ -156,6 +158,7 @@
     $('jk-addg').addEventListener('click', () => { groups.push({name: `${String.fromCharCode(65 + groups.length)}班`, member: '', area: '長崎中央', area2: NONE, count: 7, props: []}); renderGroupInputs(); if (plan) renderCards(); });
     $('jk-make').addEventListener('click', () => { if (!groups.length) { say('班を追加してください', true); return; } makePlan(); });
     $('jk-save').addEventListener('click', save);
+    $('jk-pass-copy').addEventListener('click', async e => { const t = $('jk-pass').value; if (!t) return; try { await navigator.clipboard.writeText(t); } catch { $('jk-pass').select(); document.execCommand('copy'); } e.target.textContent = 'コピーしました'; setTimeout(() => { e.target.textContent = 'コピー'; }, 1500); });
     $('jk-print').addEventListener('click', () => {
       const cards = [...document.querySelectorAll('details.jk-card')], was = cards.map(d => d.open);
       cards.forEach(d => { d.open = true; });
@@ -165,7 +168,7 @@
     $('jk-date').addEventListener('change', () => { if (plan) renderCards(); });
     $('jk-past').addEventListener('change', async () => {
       const d = $('jk-past').value;
-      if (!d) { plan = null; groups.forEach(g => { g.props = []; }); $('jk-cards').innerHTML = ''; $('saved-note').textContent = ''; return; }
+      if (!d) { plan = null; $('jk-pass').value = ''; groups.forEach(g => { g.props = []; }); $('jk-cards').innerHTML = ''; $('saved-note').textContent = ''; return; }
       try { const r = await Api.getPatrolPlan(d); if (r.plan) applyPlan(r.plan); } catch (e) { say('読み込めませんでした：' + e.message, true); }
     });
   });

@@ -125,7 +125,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-22-patrol-plan';
+const APP_VERSION = '2026-10-22-patrol-pass';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true};
 
@@ -1639,7 +1639,9 @@ function getPatrolPlan_(date) {
   const d = /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? date : idx[0];
   if (!d) return {plan: null, dates: idx};
   const raw = PropertiesService.getScriptProperties().getProperty('PP_' + d);
-  return {plan: raw ? JSON.parse(raw) : null, dates: idx};
+  const plan = raw ? JSON.parse(raw) : null;
+  if (plan && plan.pass && plan.date < todayJst_()) { plan.pass = ''; plan.passExpired = true; }
+  return {plan: plan, dates: idx};
 }
 
 function savePatrolPlan_(body) {
@@ -1650,9 +1652,10 @@ function savePatrolPlan_(body) {
     props: (Array.isArray(g.props) ? g.props : []).slice(0, 30).map(x => ({key: hankyoClean_(x.key, 120), p: hankyoClean_(x.p, 80), a: hankyoClean_(x.a, 20),
       rooms: (Array.isArray(x.rooms) ? x.rooms : []).slice(0, 30).map(r => String(r).replace(/[^0-9]/g, '')).filter(Boolean)}))
   }));
-  const plan = {date: date, groups: groups, savedAt: new Date().toISOString(), by: CURRENT_USER ? CURRENT_USER.name : ''};
+  // オペロのワンデイパス（巡回日だけ使う解錠用の情報）。社内ログイン者のみ閲覧、巡回日の翌日以降は返さない
+  const plan = {date: date, groups: groups, pass: hankyoClean_(body.pass, 1500), savedAt: new Date().toISOString(), by: CURRENT_USER ? CURRENT_USER.name : ''};
   const json = JSON.stringify(plan);
-  if (json.length > 8500) throw new Error('班分けが大きすぎます（班や物件を減らしてください）');
+  if (json.length > 8900) throw new Error('班分けが大きすぎます（班や物件を減らしてください）');
   const pr = PropertiesService.getScriptProperties();
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
