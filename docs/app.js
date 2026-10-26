@@ -88,9 +88,16 @@
     ['14日ルール完了・募集中で未照合', data.restorations.filter(x => !data.vacancies.some(y => norm(x.p)===norm(y.p) && norm(x.r)===norm(y.r))).length]
   ].map(([label,n]) => `<div class="exception-row"><span>${esc(label)}</span><strong>${fmt(n)}件</strong></div>`).join('');
   const summaryRows = [];
-  for (const area of areas) for (const key of keys) {
-    const c = counts[`${area}|${key}`], r = R?.groups?.[`${area}|${key}`];
-    summaryRows.push(`<tr><td><strong>${area}</strong>　${key==='sub'?'サブ':'一般'}</td><td class="num">${c['①']}</td><td class="num">${c['②']}</td><td class="num">${c['③']}</td><td class="num">${c['④']}</td><td class="num">${c['⑤']}</td><td class="num"><strong>${occupancy(r)}</strong></td><td class="num">${evaluated(r)}</td></tr>`);
+  for (const area of areas) {
+    const sum = emptyCounts();
+    for (const key of keys) {
+      const c = counts[`${area}|${key}`], r = R?.groups?.[`${area}|${key}`];
+      for (const t of Object.keys(sum)) sum[t] += c[t];
+      summaryRows.push(`<tr><td><strong>${area}</strong>　${key==='sub'?'サブ':'一般'}</td><td class="num">${c['①']}</td><td class="num">${c['②']}</td><td class="num">${c['③']}</td><td class="num">${c['④']}</td><td class="num">${c['⑤']}</td><td class="num"><strong>${occupancy(r)}</strong></td><td class="num">${evaluated(r)}</td></tr>`);
+    }
+    // エリア合計（サブ・一般の合算）。率はGASがエリアの管理戸数合計で計算した値
+    const ra = R?.areas?.[area];
+    summaryRows.push(`<tr class="area-total-row"><td><strong>${area}　合計</strong></td><td class="num">${sum['①']}</td><td class="num">${sum['②']}</td><td class="num">${sum['③']}</td><td class="num">${sum['④']}</td><td class="num">${sum['⑤']}</td><td class="num"><strong>${occupancy(ra)}</strong></td><td class="num"><strong>${evaluated(ra)}</strong></td></tr>`);
   }
   summaryRows.push(`<tr class="total-row"><td>全体</td><td class="num">${total['①']}</td><td class="num">${total['②']}</td><td class="num">${total['③']}</td><td class="num">${total['④']}</td><td class="num">${total['⑤']}</td><td class="num">${occupancy(R?.total)}</td><td class="num">${evaluated(R?.total)}</td></tr>`);
   document.querySelector('#summary-table tbody').innerHTML = summaryRows.join('');
