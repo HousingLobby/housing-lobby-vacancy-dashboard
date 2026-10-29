@@ -7,7 +7,7 @@
   const man = v => v == null || isNaN(v) ? '―' : `${(Math.round(v * 100) / 100).toFixed(2).replace(/\.?0+$/, '')}万円`;
   const rentNum = v => { const n = parseFloat(String(v || '').replace(/[^0-9.]/g, '')); return n > 0 ? (n > 1000 ? n / 10000 : n) : null; };
 
-  function analyze(d) {
+  function analyze(d, s) {
     const own = rentNum(d.rent);
     const m = d.market && !d.market.error && d.market.count ? d.market : null;
     const ref = m ? (m.same && m.same.count >= 3 ? m.same : m.all) : null;
@@ -33,6 +33,14 @@
     if (stage === '反響→内見で止まっている') causes.push('反響への初動（即日連絡・かってに内見の案内）と、初期費用の見せ方を確認。');
     if (stage === '内見→申込で止まっている') causes.push('内見で見送り。におい・明るさ・清掃・設備の古さ、競合物件との条件差を確認。');
     if (!d.brokerVisits) causes.push('仲介会社の同行内見がゼロ。業者への露出（AD・資料配布）が弱い可能性。');
+    // SUUMOでの見られ方（掲載物件レポート）。掲載14日未満は判断しない
+    let suumoStage = null;
+    if (s && s.days >= 14) {
+      const ctr = s.list ? s.detail / s.list : null;
+      if (s.listDay < 2) { suumoStage = 'list'; causes.push(`SUUMOの一覧にほとんど出ていない（1日${s.listDay}回）。検索条件の家賃帯・間取りから外れているか、掲載の点数が低い。`); }
+      else if (ctr != null && ctr < 0.06) { suumoStage = 'detail'; causes.push(`SUUMOの一覧には出ているが、詳細ページを開かれていない（一覧→詳細 ${pct(s.detail, s.list)}）。1枚目の写真・家賃・キャッチで外れている。`); }
+      else if (s.detailDay >= 1 && !s.inq) { suumoStage = 'inquiry'; causes.push(`SUUMOの詳細ページは1日${s.detailDay}回見られているのに問い合わせがない。ページを見て比較で外れている（写真の枚数・設備・初期費用）。`); }
+    }
     // 打ち手（効果・速さ・費用で点数化）
     const actions = [];
     const add = (name, effect, speed, cost, why) => actions.push({name, effect, speed, cost, why, score: effect * 2 + speed - cost});
@@ -41,6 +49,9 @@
     if (stage === '反響→内見で止まっている') add('追客の徹底・かってに内見の案内', 2, 3, 0, '費用なし。担当の動きで改善できる');
     if (stage === '内見→申込で止まっている') add('ステージング・再クリーニング', 3, 2, 2, '内見時の印象を上げる');
     if (days != null && days >= 60) add('フリーレント1か月・礼金なし', 3, 3, 2, '賃料を下げずに決め手を作る');
+    if (suumoStage === 'list') add('SUUMOの掲載情報の充実・家賃帯の確認', 2, 3, 0, '一覧に出る回数を増やす。点数・検索条件の見直し');
+    if (suumoStage === 'detail') add('1枚目の写真・キャッチの見直し', 2, 3, 1, '一覧から詳細ページへ進ませる');
+    if (suumoStage === 'inquiry') add('詳細ページの写真追加・初期費用の見せ方', 2, 2, 1, '見られているのに問い合わせにつながっていない');
     add('AD設定・仲介会社への資料配布', 2, 2, 1, '他社経由の案内を増やす');
     actions.sort((a, b) => b.score - a.score);
     // オーナー様への説得材料
@@ -58,11 +69,12 @@
     if (!m) gaps.push('近隣の成約事例が取れていない（住所・間取りの未入力の可能性）');
     if (d.moveOut == null) gaps.push('「解約日」が空欄 → 空室日数が出せない');
     gaps.push('アットホームの反響は記録分のみ。未登録がないか確認');
-    return {own, m, ref, diff, days, stage, stageNote, level, causes, actions, talk, gaps};
+    if (s === null) gaps.push('SUUMOの掲載物件レポートにこの部屋がない（未掲載か、物件名・号室の表記違い）');
+    return {s, own, m, ref, diff, days, stage, stageNote, level, causes, actions, talk, gaps};
   }
 
   function render(d, extra = {}) {
-    const a = analyze(d);
+    const a = analyze(d, extra.suumo);
     const pr = extra.patrol;
     const levelCls = a.level === '要テコ入れ' ? 'lv-bad' : a.level === '順調' ? 'lv-good' : 'lv-mid';
     const funnel = [['反響', d.total, ''], ['内見', d.viewed, pct(d.viewed, d.total)], ['申込', d.applied, pct(d.applied, d.viewed)]];
@@ -79,6 +91,8 @@
         </div>
         <h3>どこで止まっているか（直近${d.months}か月）</h3>
         <div class="funnel">${funnel.map(([k, v, r], i) => `<div class="f-step"><span>${k}</span><strong>${v}件</strong>${i ? `<small>前段階から ${r}</small>` : ''}</div>`).join('<div class="f-arrow">→</div>')}</div>
+        ${a.s ? `<h3>SUUMOでの見られ方（${esc(a.s.date.replace(/-/g, '/'))}のレポート・掲載${a.s.days}日分）</h3>
+        <div class="funnel">${[['一覧での表示', a.s.list, `1日 ${a.s.listDay}回`], ['詳細ページの閲覧', a.s.detail, `1日 ${a.s.detailDay}回・一覧から ${pct(a.s.detail, a.s.list)}`], ['問い合わせ', a.s.inq, `閲覧から ${pct(a.s.inq, a.s.detail)}`]].map(([k, v, r]) => `<div class="f-step"><span>${k}</span><strong>${v ?? '―'}</strong><small>${r}</small></div>`).join('<div class="f-arrow">→</div>')}</div>` : ''}
         ${a.ref ? `<p>相場の位置：成約中央値 ${man(a.ref.median)}（中央の半数 ${man(a.ref.q1)}〜${man(a.ref.q3)}）に対し、この部屋 ${man(a.own)}。</p>` : ''}
         <h3>原因の仮説</h3>
         <ul>${a.causes.map(c => `<li>${esc(c)}</li>`).join('') || '<li>目立った原因は見当たらない。現地の声を集める。</li>'}</ul>

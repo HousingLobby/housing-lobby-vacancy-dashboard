@@ -67,7 +67,7 @@
         d.brokerVisits ? `仲介業者の同行内見が${d.brokerVisits}件ありました。` : '仲介業者の同行内見の記録はありません（報告漏れがないかも確認します）。'];
     el('report').innerHTML = `
       <h1>${esc(d.property)} ${esc(d.room)}　反響レポート</h1>
-      ${window.ReportInternal ? window.ReportInternal.render(d, {patrol: lastPatrol}) : ''}
+      ${window.ReportInternal ? window.ReportInternal.render(d, {patrol: lastPatrol, suumo: lastSuumo}) : ''}
       <h2 class="internal-divider">集計の詳細</h2>
       <p class="sub">${esc(d.area || '')}／${esc(d.management || '')}${d.layout ? '／' + esc(d.layout) : ''}${rentText(d.rent) ? '／' + rentText(d.rent) : ''}　集計期間：${fmt(d.from)}〜${fmt(d.to)}（直近${d.months}か月）　作成日：${fmt(d.to)}</p>
       <div class="kpi-row">
@@ -91,7 +91,7 @@
     el('report').hidden = false; el('print').hidden = false; el('docx').hidden = false; el('msg').hidden = true;
     lastData = d;
   };
-  let lastData = null, lastPatrol = null;
+  let lastData = null, lastPatrol = null, lastSuumo; // lastSuumo：undefined＝レポート未取り込み、null＝この部屋がレポートにない
   // 最新の巡回結果（社内分析とオーナー報告書の両方で使う）
   const loadPatrol = async () => {
     try {
@@ -108,6 +108,10 @@
         const snap = await api.snapshot();
         const room = snap.vacancies.find(r => r.id === id);
         if (room) {
+          try {
+            const su = (await api.suumo()).suumo;
+            lastSuumo = su && su.dates && su.dates.length ? (su.rooms[window.Suumo.key(room.p, room.r)] || null) : undefined;
+          } catch { lastSuumo = undefined; }
           const key = String(room.p || '').normalize('NFKC').replace(/[\s・･.．\-‐‑–—－_（）()]+/g, '').toLowerCase();
           address = (snap.addresses || window.HOUSING_ADDRESSES)?.properties?.[`${key}|${room.a || ''}`]?.address || '';
         }
