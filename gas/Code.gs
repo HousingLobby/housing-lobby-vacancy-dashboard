@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-29-management';
+const APP_VERSION = '2026-10-29-suumo';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -166,6 +166,9 @@ function handle_(action, body) {
     case 'getPatrolPlan': return getPatrolPlan_(body.date);
     case 'parking': return {parking: parkingGet_()};
     case 'setParking': return setParking_(body);
+    // SUUMO掲載物件レポート（閲覧数・問い合わせ）
+    case 'suumo': return {suumo: suumoGet_()};
+    case 'suumoImport': return suumoImport_(body);
     case 'savePatrolPlan': return savePatrolPlan_(body);
     case 'hankyoCheckRequest': return hankyoCheckRequest_();
     case 'hankyoCheckStatus': return {check: hankyoCheckGet__()};
@@ -1196,7 +1199,7 @@ function patrolPhotos_(body) {
 function exportSettingsForMigration() {
   const all = PropertiesService.getScriptProperties().getProperties();
   const out = {};
-  Object.keys(all).forEach(k => { if (!/^(X_(?!L_)|STATUS_|ALERTED_|PATROL_FIELDS$)/.test(k)) out[k] = all[k]; }); // X_L_（巡回索引）は移す
+  Object.keys(all).forEach(k => { if (!/^(X_(?!L_|SU_)|STATUS_|ALERTED_|PATROL_FIELDS$)/.test(k)) out[k] = all[k]; }); // X_L_（巡回索引）・X_SU_（SUUMOレポート）は移す
   Logger.log('移す設定：' + Object.keys(out).length + '件（' + Object.keys(out).filter(k => !/^[LM]_/.test(k)).join(', ') + ' ほか）');
   Logger.log(Utilities.base64Encode(JSON.stringify(out), Utilities.Charset.UTF_8));
 }
@@ -1883,3 +1886,46 @@ function setParking_(body) {
     return {ok: true, parking: m};
   } finally { lock.releaseLock(); }
 }
+
+/* ---------- SUUMO掲載物件レポート（閲覧数・問い合わせ） ----------
+   SUUMOの「掲載物件レポート」CSVを画面で読み、部屋ごとの数字だけをここへ送る。
+   保存するのは部屋ごとの最新の値（{レポート日, 掲載日数, 一覧PV, 詳細PV, 問い合わせ…}）と、取り込んだレポート日の一覧。
+   同じ日付のレポートは取り込まない。古い日付のレポートで新しい値を上書きしない。 */
+function suumoKey_(p, r) {
+  const n = v => String(v == null ? '' : v).normalize('NFKC').replace(/[\s・･]/g, '').toLowerCase();
+  return n(p) + '|' + n(r).replace(/\(.*?\)/g, '').replace(/号室?$/, ''); // 号室の「(3DK)」「号」は除く
+}
+
+function suumoGet_() {
+  try { return JSON.parse(persistGet_('SU') || 'null') || {dates: [], rooms: {}}; } catch (_) { return {dates: [], rooms: {}}; }
+}
+
+function suumoImport_(body) {
+  const date = String(body.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('レポートの日付が正しくありません');
+  const rows = Array.isArray(body.rows) ? body.rows : [];
+  if (!rows.length || rows.length > 2000) throw new Error('部屋のデータがありません');
+  const num = v => { const x = Number(v); return isFinite(x) ? x : null; };
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const store = suumoGet_();
+    if (store.dates.indexOf(date) >= 0) return {ok: true, skipped: true, date: date, suumo: store};
+    let updated = 0;
+    rows.forEach(r => {
+      const p = hankyoClean_(r.p, 80), room = hankyoClean_(r.r, 20);
+      if (!p) return;
+      const key = suumoKey_(p, room);
+      const cur = store.rooms[key];
+      if (cur && cur.date > date) return; // より新しいレポートの値を残す
+      store.rooms[key] = {date: date, p: p, r: room, listed: Boolean(r.listed), days: num(r.days),
+        list: num(r.list), listDay: num(r.listDay), detail: num(r.detail), detailDay: num(r.detailDay), inq: num(r.inq)};
+      updated++;
+    });
+    store.dates = store.dates.concat(date).sort().slice(-60);
+    const keepFrom = addDays_(date, -180); // 半年以上レポートに出てこない部屋は消す（容量を増やし続けない）
+    Object.keys(store.rooms).forEach(k => { if (store.rooms[k].date < keepFrom) delete store.rooms[k]; });
+    persistPut_('SU', JSON.stringify(store));
+    return {ok: true, skipped: false, date: date, updated: updated, suumo: store};
+  } finally { lock.releaseLock(); }
+}
+

@@ -86,6 +86,8 @@
     hankyoList: () => request({action: 'hankyoList'}),
     hankyoGet: id => request({action: 'hankyoGet', id}),
     parking: () => request({action: 'parking'}),
+    suumo: () => request({action: 'suumo'}),
+    suumoImport: body => request(null, {action: 'suumoImport', ...body}, 90000),
     setParking: body => request(null, {action: 'setParking', ...body}),
     getPatrolPlan: date => request({action: 'getPatrolPlan', ...(date ? {date} : {})}),
     savePatrolPlan: body => request(null, {action: 'savePatrolPlan', ...body}),

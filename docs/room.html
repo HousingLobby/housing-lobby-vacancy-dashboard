@@ -15,10 +15,11 @@
   <script defer src="snapshot-current.js?v=20261008auth"></script>
   <script defer src="patrol-store.js?v=20261002"></script>
   <script defer src="patrol-items.js?v=20261022"></script>
-  <script defer src="api.js?v=20261022b"></script>
+  <script defer src="api.js?v=20261029s"></script>
   <script defer src="outbox.js?v=20261008auth"></script>
   <script defer src="outbox-bar.js?v=20261008auth"></script>
-  <script defer src="room.js?v=20261022d"></script>
+  <script defer src="suumo.js?v=20261029"></script>
+  <script defer src="room.js?v=20261029"></script>
 </head>
 <body>
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
@@ -34,6 +35,7 @@
       </section>
       <div class="two-metrics"><div class="metric-line room-metric"><span>前回巡回</span><strong id="last-patrol">未登録</strong></div><div class="metric-line room-metric"><span>次回巡回予定</span><strong id="next-patrol">未設定</strong></div></div>
       <div class="notice" id="sibling-note" hidden></div>
+      <section class="panel" id="suumo-panel" hidden><div class="panel-heading"><h2>SUUMOの閲覧数・問い合わせ</h2><span>掲載物件レポートから</span></div><div id="suumo-body"></div></section>
       <div class="notice subtle" id="staging-source"></div>
       <div class="room-grid">
         <section class="panel"><div class="panel-heading"><h2>巡回内容を登録</h2><span>各項目の有無をチェック</span></div>

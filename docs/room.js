@@ -49,6 +49,7 @@
     });
   }
   el('asana-link').href = `https://app.asana.com/0/1201255767385595/${encodeURIComponent(room.id)}`;
+  if (shared && window.Suumo) api.suumo().then(res => { el('suumo-body').innerHTML = window.Suumo.roomHtml(res.suumo, room); el('suumo-panel').hidden = false; }).catch(() => {});
   // 同じ物件・号室のタスクが【募集中】に複数ある場合は知らせる（登録先の取り違え防止）
   const norm = v => String(v ?? '').normalize('NFKC').replace(/\s+/g, '');
   const siblings = data.vacancies.filter(row => row.id !== room.id && row.p && norm(row.p) === norm(room.p) && norm(row.r) === norm(room.r));
