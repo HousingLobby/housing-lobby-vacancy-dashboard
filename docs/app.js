@@ -112,14 +112,17 @@
   ['area-filter','status-filter','search'].forEach(id => el(id).addEventListener(id==='search'?'input':'change', renderListings));
   renderListings();
 
-  el('completed-count').textContent = `${data.restorations.length}件`;
+  // 原状回復完了は直近7日間に完了したものだけ表示する
+  const recentFrom = Date.now() - 7 * 86400000;
+  const recentRestorations = data.restorations.filter(row => Date.parse(row.at) >= recentFrom);
+  el('completed-count').textContent = `${recentRestorations.length}件`;
   el('reflected-count').textContent = `${total['①']}戸`;
-  el('restoration-body').innerHTML = data.restorations.map(row => {
+  el('restoration-body').innerHTML = recentRestorations.length ? recentRestorations.map(row => {
     const matches = data.vacancies.filter(v => norm(v.p)===norm(row.p) && norm(v.r)===norm(row.r));
     const status = matches.length===1 ? matches[0].c : null;
     const outcome = matches.length===0 ? badge('他セクションを要確認','warn') : matches.length>1 ? badge('募集中で重複','warn') : ['原状回復完了','ステージング完了'].includes(status) ? badge('反映済（募集中）','good') : badge('状態を要確認','warn');
     return `<tr><td>${esc(row.p||'物件名なし')} ${esc(String(row.r||'号室なし').trim())}</td><td>${dateTime(row.at)}</td><td>${outcome}</td><td>${esc(status||'—')}</td><td><a href="${sourceUrl(row.id)}" target="_blank" rel="noopener noreferrer">開く ↗</a></td></tr>`;
-  }).join('');
+  }).join('') : '<tr><td colspan="5" class="empty">直近1週間に完了したタスクはありません</td></tr>';
 
   // 空室日数＝今日−解約日。長い順（解約日不明は最後）
   const dayNum = d => Date.UTC(...d.split('-').map((v,i)=>i===1?Number(v)-1:Number(v)));

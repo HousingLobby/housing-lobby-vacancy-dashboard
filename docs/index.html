@@ -17,7 +17,7 @@
   <script defer src="nav.js?v=20261022"></script>
   <script defer src="outbox.js?v=20261008auth"></script>
   <script defer src="outbox-bar.js?v=20261008auth"></script>
-  <script defer src="app.js?v=20261026"></script>
+  <script defer src="app.js?v=20261029"></script>
   <script defer src="monthend.js?v=20261022n"></script>
   <script defer src="promotion.js?v=20261022n"></script>
   <script defer src="promotion-report.js?v=20261016"></script>
@@ -70,9 +70,9 @@
 
     <section class="view" id="view-restoration" aria-labelledby="restoration-title" hidden>
       <div class="section-heading"><div><p class="eyebrow">RESTORATION</p><h1 id="restoration-title">原状回復完了</h1></div><p class="section-meta">「清掃完了」と同じ意味で扱います</p></div>
-      <div class="two-metrics"><div class="metric-line"><strong id="completed-count"></strong><span>9月14日以降に完了した14日ルールのタスク</span></div><div class="metric-line"><strong id="reflected-count"></strong><span>「募集中」で原状回復完了・ステージング完了</span></div></div>
+      <div class="two-metrics"><div class="metric-line"><strong id="completed-count"></strong><span>直近1週間に完了した14日ルールのタスク</span></div><div class="metric-line"><strong id="reflected-count"></strong><span>「募集中」で原状回復完了・ステージング完了</span></div></div>
       <div class="notice subtle">下表の照合先は今回取得した「募集中」の未完了タスクのみです。空室一覧の他セクションも含めた一意照合・更新候補の確定は未実施です。</div>
-      <div class="panel"><div class="panel-heading"><h2>14日ルール完了タスク</h2><span>Asanaの実際の完了日時で判定</span></div><div class="table-scroll"><table class="list-table"><thead><tr><th>物件・号室</th><th>完了日時</th><th>募集中での照合</th><th>空室一覧の状態</th><th>元タスク</th></tr></thead><tbody id="restoration-body"></tbody></table></div></div>
+      <div class="panel"><div class="panel-heading"><h2>14日ルール完了タスク（直近1週間）</h2><span>Asanaの実際の完了日時で判定</span></div><div class="table-scroll"><table class="list-table"><thead><tr><th>物件・号室</th><th>完了日時</th><th>募集中での照合</th><th>空室一覧の状態</th><th>元タスク</th></tr></thead><tbody id="restoration-body"></tbody></table></div></div>
     </section>
 
     <section class="view" id="view-patrol" aria-labelledby="patrol-title" hidden>
