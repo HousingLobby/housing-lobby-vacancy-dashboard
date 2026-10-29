@@ -958,9 +958,10 @@ function colLetter_(n) { let s = ''; for (; n > 0; n = Math.floor((n - 1) / 26))
 
 const cellText_ = v => String(v == null ? '' : v).trim();
 
-/** 最新の全体会議資料から管理戸数を読み、更新済みなら3か所（ダッシュボード・入居率週報・HP報告シート）に反映する。
-    会議資料は前月分を複製して作るため、「3.入居率推移」の「全体」行で実績月が埋まっているときだけ更新済みとみなす。
-    同じ値が入っていれば書かない。見出しが想定と違う反映先は書かずに通知する */
+/** 最新の全体会議資料から管理戸数を読み、その資料の実績月として3か所（ダッシュボード・入居率週報・HP報告シート）に反映する。
+    資料の中に「更新済み」を見分けられる目印がないため、毎朝最新の資料を読み、値が変わっていれば上書きする（同じ値なら書かない）。
+    前月の複製のままなら前月の値が一時的に入るが、資料が直れば翌朝上書きされる。書いたときは値つきで通知する。
+    見出しが想定と違う反映先は書かずに通知する */
 function importManagementFromMeetingDoc() {
   const token = graphToken_();
   const driveId = CFG.meetingDocs.driveId, base = CFG.meetingDocs.folder;
@@ -987,22 +988,7 @@ function importManagementFromMeetingDoc() {
     .filter(w => w.era).sort((a, b) => Number(b.era) - Number(a.era))[0];
   if (!sheet) throw new Error(file.name + '：「令和○年○月期」タブが見つかりません');
 
-  // 更新済みの判定：「3.入居率推移」（C15:AE20）の「全体」行で、実績月の列が埋まっているか
-  const trend = graphGet_(token, docPath + wsPath_(sheet.name) + "/range(address='C15:AE20')").values;
-  ['長崎中央', '長崎北', '諫早', '大村', '全体'].forEach((label, i) => {
-    if (cellText_(trend[i + 1][0]) !== label) throw new Error(file.name + '：「3.入居率推移」の見出しが想定と違います（' + trend[i + 1][0] + '）。セル位置を確認してください');
-  });
-  const tcol = trend[0].findIndex(v => cellText_(v) === actualMonth + '月');
-  if (tcol < 0) throw new Error(file.name + '：「3.入居率推移」に' + actualMonth + '月の列が見つかりません');
   const pr = PropertiesService.getScriptProperties();
-  if (cellText_(trend[5][tcol]) === '') {
-    Logger.log(month + '：会議資料が未更新（' + file.name + '）');
-    if (pr.getProperty('MGMT_PENDING') !== month) { // 未更新の通知は月に1回だけ
-      pr.setProperty('MGMT_PENDING', month);
-      notifyAdmin_('管理戸数：会議資料がまだ更新されていません', file.name + ' の「3.入居率推移」で ' + actualMonth + '月の全体の入居率が空欄のため、前月の複製とみなして反映していません。資料が更新されると、翌朝の自動処理で反映します。');
-    }
-    return {month: month, status: 'pending'};
-  }
 
   // 「2.エリア別」：4行目＝見出し、5行目＝サブリース戸数、8行目＝一般管理戸数、11行目＝合計戸数。列 X/Z/AB/AD＝長崎中央/長崎北/諫早/大村、AF＝計
   const values = graphGet_(token, docPath + wsPath_(sheet.name) + "/range(address='X4:AF11')").values;
@@ -1029,7 +1015,6 @@ function importManagementFromMeetingDoc() {
   // ② 入居率週報　③ HP報告シート
   try { done.push('入居率週報：' + writeWeeklyManagement_(token, year, actualMonth, areas)); } catch (e) { errors.push('入居率週報：' + e.message); }
   try { done.push('HP報告シート：' + writeHpManagement_(token, year, actualMonth, total)); } catch (e) { errors.push('HP報告シート：' + e.message); }
-  pr.deleteProperty('MGMT_PENDING');
 
   Logger.log(month + '（' + file.name + '）\n' + done.concat(errors).join('\n'));
   if (done.some(x => !/変更なし$/.test(x)) || errors.length) {
