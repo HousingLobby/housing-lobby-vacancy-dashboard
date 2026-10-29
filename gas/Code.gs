@@ -48,6 +48,16 @@ const CFG = {
     driveId: 'b!hr3BLeHR3kGhFBj-PRWaEAsQrCRVof5CtE5S4_fM07x9HrQe6ngeSYxlhRj_B_nL', // Teams 全社チーム
     folder: '18全体月次会議／全員グループ　会議資料　全体会議　月1回'
   },
+  // 管理戸数の反映先（書き込みには、アプリに各サイトの Sites.Selected の write 許可が要る）
+  weeklyReport: { // 入居率週報：実績月のタブの「最終」列（G列）
+    driveId: 'b!uWbFFqgH5Ua3uaqza-aacel6pdQwy8FOmyZFhh_m8PW-dvlEgNLVS7Elv2KMIldQ', // 営業
+    path: '01営業報告／営業/☆リーシング数字☆/入居率進捗表 週報 (テスト中).xlsx'
+  },
+  hpReport: { // ホームページ更新用報告シート：「管理戸数」の行の実績月の列（合計）
+    driveId: 'b!hr3BLeHR3kGhFBj-PRWaEAsQrCRVof5CtE5S4_fM07x9HrQe6ngeSYxlhRj_B_nL', // Teams 全社チーム
+    path: '19_SNS共有（WEB室）／全員グループ/ホームページ更新用報告シート.xlsx',
+    sheet: 'ホームページ報告シート'
+  },
   marker: '【巡回記録】',
   intervalDays: 45,
   // 現地確認の項目（docs/patrol-items.js と同じ内容に保つ）。Asanaの項目（プロパティ）とは連動しない
@@ -126,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-29-patrolindex';
+const APP_VERSION = '2026-10-29-management';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -931,55 +941,160 @@ function graphChildren_(token, itemPath) {
   return graphGet_(token, '/drives/' + CFG.meetingDocs.driveId + '/root:/' + enc + ':/children?$top=200').value || [];
 }
 
-/** 最新の全体会議資料を探して管理戸数を読み、M_YYYY-MM（実績月）に保存する。変化がなければ何もしない */
+function graphPatch_(token, path, payload) {
+  const res = UrlFetchApp.fetch('https://graph.microsoft.com/v1.0' + path, {method: 'patch', contentType: 'application/json',
+    payload: JSON.stringify(payload), headers: {Authorization: 'Bearer ' + token}, muteHttpExceptions: true});
+  if (res.getResponseCode() >= 300) throw new Error('Microsoft Graph ' + res.getResponseCode() + '（書き込み）：' + path);
+  return JSON.parse(res.getContentText() || '{}');
+}
+
+function graphItemByPath_(token, driveId, itemPath) {
+  return graphGet_(token, '/drives/' + driveId + '/root:/' + itemPath.split('/').map(encodeURIComponent).join('/'));
+}
+
+function wsPath_(name) { return "/workbook/worksheets('" + encodeURIComponent(String(name).replace(/'/g, "''")) + "')"; }
+
+function colLetter_(n) { let s = ''; for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s; return s; }
+
+const cellText_ = v => String(v == null ? '' : v).trim();
+
+/** 最新の全体会議資料から管理戸数を読み、更新済みなら3か所（ダッシュボード・入居率週報・HP報告シート）に反映する。
+    会議資料は前月分を複製して作るため、「3.入居率推移」の「全体」行で実績月が埋まっているときだけ更新済みとみなす。
+    同じ値が入っていれば書かない。見出しが想定と違う反映先は書かずに通知する */
 function importManagementFromMeetingDoc() {
   const token = graphToken_();
-  const base = CFG.meetingDocs.folder;
+  const driveId = CFG.meetingDocs.driveId, base = CFG.meetingDocs.folder;
   const years = graphChildren_(token, base).filter(x => x.folder && /^\d{4}年$/.test(x.name)).map(x => x.name).sort();
   if (!years.length) throw new Error('年フォルダが見つかりません');
   const yearPath = base + '/' + years[years.length - 1];
   const rounds = graphChildren_(token, yearPath).filter(x => x.folder && /^第\d+回\d{6}/.test(x.name))
     .sort((a, b) => Number(b.name.match(/^第(\d+)回/)[1]) - Number(a.name.match(/^第(\d+)回/)[1]));
+  let file = null;
   for (const round of rounds) {
-    const file = graphChildren_(token, yearPath + '/' + round.name)
+    file = graphChildren_(token, yearPath + '/' + round.name)
       .filter(x => x.file && /全体会議資料.*\.xlsx$/.test(x.name) && /(\d{4})年(\d{1,2})月度[（(](\d{1,2})月実績/.test(x.name))[0];
-    if (!file) continue;
-    const m = file.name.match(/(\d{4})年(\d{1,2})月度[（(](\d{1,2})月実績/);
-    const year = Number(m[3]) > Number(m[2]) ? Number(m[1]) - 1 : Number(m[1]);
-    const month = year + '-' + ('0' + m[3]).slice(-2);
-    const sheets = graphGet_(token, '/drives/' + CFG.meetingDocs.driveId + '/items/' + file.id + '/workbook/worksheets').value || [];
-    const sheet = sheets.find(w => /^令和\d+年\d+月期/.test(String(w.name).trim()));
-    if (!sheet) throw new Error(file.name + '：「令和○年○月期」タブが見つかりません');
-    const values = graphGet_(token, '/drives/' + CFG.meetingDocs.driveId + '/items/' + file.id +
-      "/workbook/worksheets('" + encodeURIComponent(sheet.name) + "')/range(address='X4:AF8')").values;
-    // 「2.エリア別」：4行目＝見出し、5行目＝サブリース戸数、8行目＝一般管理戸数。列 X/Z/AB/AD＝長崎中央/長崎北/諫早/大村、AF＝計
-    const cols = {'長崎中央': 0, '長崎北': 2, '諫早': 4, '大村': 6};
-    const areas = {};
-    Object.keys(cols).forEach(a => {
-      if (String(values[0][cols[a]]).trim() !== a) throw new Error(file.name + '：見出しが想定と違います（' + values[0][cols[a]] + '）。セル位置を確認してください');
-      areas[a] = {sub: Number(values[1][cols[a]]), general: Number(values[4][cols[a]])};
-      if (!isFinite(areas[a].sub) || !isFinite(areas[a].general)) throw new Error(file.name + '：' + a + 'の戸数が数値ではありません');
-    });
-    const sum = k => Object.keys(areas).reduce((n, a) => n + areas[a][k], 0);
-    if (sum('sub') !== Number(values[1][8]) || sum('general') !== Number(values[4][8])) throw new Error(file.name + '：合計が一致しません');
-    const pr = PropertiesService.getScriptProperties();
-    const before = pr.getProperty('M_' + month);
-    const prevAreas = before ? JSON.stringify(JSON.parse(before).areas) : null;
-    if (prevAreas === JSON.stringify(areas)) { Logger.log(month + '：変更なし（' + file.name + '）'); return; }
+    if (file) break;
+  }
+  if (!file) throw new Error('全体会議資料が見つかりません');
+  const m = file.name.match(/(\d{4})年(\d{1,2})月度[（(](\d{1,2})月実績/);
+  const actualMonth = Number(m[3]);
+  const year = actualMonth > Number(m[2]) ? Number(m[1]) - 1 : Number(m[1]);
+  const month = year + '-' + ('0' + actualMonth).slice(-2);
+  const docPath = '/drives/' + driveId + '/items/' + file.id;
+  // 「令和○年○月期」タブ（過去の期のタブも残っているので、いちばん新しい期を使う）
+  const sheet = (graphGet_(token, docPath + '/workbook/worksheets').value || [])
+    .map(w => ({name: w.name, era: (cellText_(w.name).match(/^令和(\d+)年\d+月期/) || [])[1]}))
+    .filter(w => w.era).sort((a, b) => Number(b.era) - Number(a.era))[0];
+  if (!sheet) throw new Error(file.name + '：「令和○年○月期」タブが見つかりません');
+
+  // 更新済みの判定：「3.入居率推移」（C15:AE20）の「全体」行で、実績月の列が埋まっているか
+  const trend = graphGet_(token, docPath + wsPath_(sheet.name) + "/range(address='C15:AE20')").values;
+  ['長崎中央', '長崎北', '諫早', '大村', '全体'].forEach((label, i) => {
+    if (cellText_(trend[i + 1][0]) !== label) throw new Error(file.name + '：「3.入居率推移」の見出しが想定と違います（' + trend[i + 1][0] + '）。セル位置を確認してください');
+  });
+  const tcol = trend[0].findIndex(v => cellText_(v) === actualMonth + '月');
+  if (tcol < 0) throw new Error(file.name + '：「3.入居率推移」に' + actualMonth + '月の列が見つかりません');
+  const pr = PropertiesService.getScriptProperties();
+  if (cellText_(trend[5][tcol]) === '') {
+    Logger.log(month + '：会議資料が未更新（' + file.name + '）');
+    if (pr.getProperty('MGMT_PENDING') !== month) { // 未更新の通知は月に1回だけ
+      pr.setProperty('MGMT_PENDING', month);
+      notifyAdmin_('管理戸数：会議資料がまだ更新されていません', file.name + ' の「3.入居率推移」で ' + actualMonth + '月の全体の入居率が空欄のため、前月の複製とみなして反映していません。資料が更新されると、翌朝の自動処理で反映します。');
+    }
+    return {month: month, status: 'pending'};
+  }
+
+  // 「2.エリア別」：4行目＝見出し、5行目＝サブリース戸数、8行目＝一般管理戸数、11行目＝合計戸数。列 X/Z/AB/AD＝長崎中央/長崎北/諫早/大村、AF＝計
+  const values = graphGet_(token, docPath + wsPath_(sheet.name) + "/range(address='X4:AF11')").values;
+  const cols = {'長崎中央': 0, '長崎北': 2, '諫早': 4, '大村': 6};
+  const areas = {};
+  Object.keys(cols).forEach(a => {
+    if (cellText_(values[0][cols[a]]) !== a) throw new Error(file.name + '：見出しが想定と違います（' + values[0][cols[a]] + '）。セル位置を確認してください');
+    areas[a] = {sub: Number(values[1][cols[a]]), general: Number(values[4][cols[a]])};
+    if (!isFinite(areas[a].sub) || !isFinite(areas[a].general)) throw new Error(file.name + '：' + a + 'の戸数が数値ではありません');
+  });
+  const sum = k => Object.keys(areas).reduce((n, a) => n + areas[a][k], 0);
+  const total = Number(values[7][8]);
+  if (sum('sub') !== Number(values[1][8]) || sum('general') !== Number(values[4][8]) || total !== sum('sub') + sum('general')) throw new Error(file.name + '：合計が一致しません');
+
+  const done = [], errors = [];
+  // ① ダッシュボード（M_YYYY-MM）
+  const before = pr.getProperty('M_' + month);
+  if (before && JSON.stringify(JSON.parse(before).areas) === JSON.stringify(areas)) done.push('ダッシュボード：変更なし');
+  else {
     pr.setProperty('M_' + month, JSON.stringify({areas: areas, source: file.name + '「' + sheet.name.trim() + '」2.エリア別（自動取得）', savedAt: new Date().toISOString()}));
     CacheService.getScriptCache().remove('snapshot_n');
-    Logger.log(month + '：登録しました（' + file.name + '）');
-    notifyAdmin_('管理戸数を自動登録しました', month + ' の管理戸数を ' + file.name + ' から登録しました（サブ' + sum('sub') + '・一般' + sum('general') + '）。');
-    return;
+    done.push('ダッシュボード：登録しました');
   }
-  throw new Error('全体会議資料が見つかりません');
+  // ② 入居率週報　③ HP報告シート
+  try { done.push('入居率週報：' + writeWeeklyManagement_(token, year, actualMonth, areas)); } catch (e) { errors.push('入居率週報：' + e.message); }
+  try { done.push('HP報告シート：' + writeHpManagement_(token, year, actualMonth, total)); } catch (e) { errors.push('HP報告シート：' + e.message); }
+  pr.deleteProperty('MGMT_PENDING');
+
+  Logger.log(month + '（' + file.name + '）\n' + done.concat(errors).join('\n'));
+  if (done.some(x => !/変更なし$/.test(x)) || errors.length) {
+    notifyAdmin_('管理戸数を自動反映しました' + (errors.length ? '（一部できませんでした）' : ''),
+      month + ' の管理戸数を ' + file.name + ' から反映しました（サブ' + sum('sub') + '・一般' + sum('general') + '・合計' + total + '）。\n\n' + done.join('\n') +
+      (errors.length ? '\n\n反映できなかったもの（見出しや場所を確認してください）：\n' + errors.join('\n') : ''), errors.length ? 'mgmt_write' : null);
+  }
+  return {month: month, status: errors.length ? 'partial' : 'ok', done: done, errors: errors};
 }
 
-/** 手動で1回実行：自動処理を登録する（15分ごとのデータ更新、毎日17:30の点検・管理戸数の自動取得） */
+/** 入居率週報：実績月のタブ「【新書式】YYYY年M月入居率進捗表」の G列（最終）の8セルに、エリア別の管理戸数を入れる。小計・合計の行は数式なので触らない */
+function writeWeeklyManagement_(token, year, month, areas) {
+  const t = CFG.weeklyReport;
+  const path = '/drives/' + t.driveId + '/items/' + graphItemByPath_(token, t.driveId, t.path).id;
+  const ws = (graphGet_(token, path + '/workbook/worksheets').value || []).find(w => {
+    const mm = cellText_(w.name).match(/^【新書式】(\d{4})年(\d{1,2})月入居率進捗表$/);
+    return mm && Number(mm[1]) === year && Number(mm[2]) === month;
+  });
+  if (!ws) throw new Error(year + '年' + month + '月のタブが見つかりません');
+  const v = graphGet_(token, path + wsPath_(ws.name) + "/range(address='A4:G20')").values;
+  const row = r => v[r - 4];
+  if (cellText_(row(4)[2]) !== '管理戸数' || cellText_(row(5)[6]) !== '最終' || cellText_(row(14)[2]) !== '管理戸数' || !/^(最終|[５5]w)$/.test(cellText_(row(15)[6])))
+    throw new Error(ws.name.trim() + '：見出し（管理戸数・最終）が想定と違います');
+  const plan = [[6, '長崎中央', 'sub'], [7, '長崎中央', 'general'], [9, '長崎北', 'sub'], [10, '長崎北', 'general'],
+    [16, '諫早', 'sub'], [17, '諫早', 'general'], [19, '大村', 'sub'], [20, '大村', 'general']];
+  plan.forEach(([r, area, kind]) => {
+    if (cellText_(row(r)[1]) !== area || cellText_(row(r)[0]).indexOf(kind === 'sub' ? 'サブ' : '一般') !== 0)
+      throw new Error(ws.name.trim() + '：' + r + '行目が「' + area + '・' + (kind === 'sub' ? 'サブ' : '一般') + '」ではありません');
+  });
+  if (plan.every(([r, area, kind]) => Number(row(r)[6]) === areas[area][kind]) && plan.every(([r]) => cellText_(row(r)[6]) !== '')) return '変更なし';
+  [[6, 7], [9, 10], [16, 17], [19, 20]].forEach(([r1, r2]) => {
+    const vals = plan.filter(p => p[0] === r1 || p[0] === r2).map(([, area, kind]) => [areas[area][kind]]);
+    graphPatch_(token, path + wsPath_(ws.name) + "/range(address='G" + r1 + ':G' + r2 + "')", {values: vals});
+  });
+  return '書き込みました（' + ws.name.trim() + ' G列）';
+}
+
+/** HP報告シート：「年度」「月」の見出しで実績月の列を探し、「管理戸数」の行に合計を入れる。「管理物件数」（棟数）の行は触らない */
+function writeHpManagement_(token, year, month, total) {
+  const t = CFG.hpReport;
+  const path = '/drives/' + t.driveId + '/items/' + graphItemByPath_(token, t.driveId, t.path).id;
+  const v = graphGet_(token, path + wsPath_(t.sheet) + "/range(address='B2:AD12')").values;
+  const findRow = label => v.findIndex(r => cellText_(r[1]) === label);
+  const yr = findRow('年度'), mr = findRow('月'), kr = findRow('管理戸数');
+  if (yr < 0 || mr < 0 || kr < 0) throw new Error(t.sheet + '：「年度」「月」「管理戸数」の行が見つかりません');
+  const c = v[yr].findIndex((x, i) => i > 1 && cellText_(x).replace(/年$/, '') === String(year) && cellText_(v[mr][i]).replace(/月$/, '') === String(month));
+  if (c < 0) throw new Error(t.sheet + '：' + year + '年' + month + '月の列が見つかりません');
+  if (Number(String(v[kr][c]).replace(/,/g, '')) === total && cellText_(v[kr][c]) !== '') return '変更なし';
+  const address = colLetter_(c + 2) + (kr + 2); // B2 起点
+  graphPatch_(token, path + wsPath_(t.sheet) + "/range(address='" + address + "')", {values: [[total]]});
+  return '書き込みました（' + address + '）';
+}
+
+/** 毎朝：管理戸数の自動取得（入居率週報の日次自動入力（17時台）と重ならない時刻に動かす） */
+function managementJob() {
+  if (!PropertiesService.getScriptProperties().getProperty('MS_CLIENT_ID')) return;
+  try { importManagementFromMeetingDoc(); } catch (e) { notifyAdmin_('空室業務ダッシュボード：管理戸数の自動取得', String(e.message || e), 'mgmt_error'); }
+}
+
+/** 手動で1回実行：自動処理を登録する（15分ごとのデータ更新、毎日17:30の点検、毎朝9時の管理戸数の自動取得） */
 function installTriggers() {
-  ScriptApp.getProjectTriggers().filter(t => ['dailyJob', 'refreshJob'].includes(t.getHandlerFunction())).forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.getProjectTriggers().filter(t => ['dailyJob', 'refreshJob', 'managementJob'].includes(t.getHandlerFunction())).forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('dailyJob').timeBased().everyDays(1).atHour(17).nearMinute(30).inTimezone('Asia/Tokyo').create();
   ScriptApp.newTrigger('refreshJob').timeBased().everyMinutes(15).create();
+  ScriptApp.newTrigger('managementJob').timeBased().everyDays(1).atHour(9).inTimezone('Asia/Tokyo').create();
   Logger.log('自動処理を登録しました');
 }
 function installManagementTrigger() { installTriggers(); } // 旧名
@@ -1033,9 +1148,6 @@ function dailyJob() {
   const lastOk = PropertiesService.getScriptProperties().getProperty('STATUS_LAST_OK');
   if (!lastOk || Date.now() - new Date(lastOk).getTime() > 6 * 3600 * 1000) errors.push('空室データの更新が6時間以上止まっています（最終成功：' + (lastOk || 'なし') + '）。installTriggers を実行済みか確認してください');
   if (!ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'refreshJob')) errors.push('15分ごとの自動更新が登録されていません（installTriggers を実行）');
-  if (PropertiesService.getScriptProperties().getProperty('MS_CLIENT_ID')) {
-    try { importManagementFromMeetingDoc(); } catch (e) { errors.push('管理戸数の自動取得：' + e.message); }
-  }
   const latest = Object.keys(readManagement_()).sort().pop();
   const expected = (() => { const [y, m] = todayJst_().split('-').map(Number); return new Date(Date.UTC(y, m - 3, 1)).toISOString().slice(0, 7); })();
   if (!latest || latest < expected) errors.push('管理戸数が古いままです（最新：' + (latest || 'なし') + '）');
