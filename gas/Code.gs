@@ -126,7 +126,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-22-monthend';
+const APP_VERSION = '2026-10-29-patrolindex';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -693,20 +693,61 @@ function roomLabel_(task) {
 
 // ルール：Asanaに項目（カスタムフィールド）を新規作成しない。項目の追加・値の書き込みを行う関数は置かない。
 
-/* 巡回索引：タスクごとの最新巡回日（一覧表示用）。正本はAsanaコメント。 */
+/* 巡回索引：タスクごとの最新巡回日（一覧表示用）。正本はAsanaコメント。
+   {タスクID: 'YYYY-MM-DD'} のJSONを persistPut_('L') でまとめて保存する。
+   以前は部屋ごとに L_<タスクID> のスクリプトプロパティを作っていたが、50個を超えると
+   GASの設定画面が読み取り専用になるため移行した（旧形式は migratePatrolIndex_ が自動で移す）。 */
+function patrolIndexGet_() {
+  try { return JSON.parse(persistGet_('L') || '{}'); } catch (_) { return {}; }
+}
+
 function readPatrolIndex_() {
+  const dates = patrolIndexGet_();
   const props = PropertiesService.getScriptProperties().getProperties();
-  const index = {};
-  Object.keys(props).forEach(k => {
-    if (k.indexOf('L_') === 0) index[k.slice(2)] = {date: props[k], nextDate: addDays_(props[k], CFG.intervalDays)};
+  Object.keys(props).forEach(k => { // 移行前の旧形式も読む
+    if (k.indexOf('L_') === 0 && !(dates[k.slice(2)] >= props[k])) dates[k.slice(2)] = props[k];
   });
+  const index = {};
+  Object.keys(dates).forEach(id => { index[id] = {date: dates[id], nextDate: addDays_(dates[id], CFG.intervalDays)}; });
   return index;
 }
 
 function updatePatrolIndex_(task, date) {
-  const props = PropertiesService.getScriptProperties();
-  const cur = props.getProperty('L_' + task);
-  if (!cur || cur < date) props.setProperty('L_' + task, date);
+  const cur = patrolIndexGet_()[task];
+  if (cur && cur >= date) return;
+  const lock = LockService.getScriptLock();
+  const held = lock.hasLock();
+  if (!held) lock.waitLock(20000);
+  try {
+    const dates = patrolIndexGet_();
+    if (!dates[task] || dates[task] < date) { dates[task] = date; persistPut_('L', JSON.stringify(dates)); }
+  } finally {
+    if (!held) lock.releaseLock();
+  }
+}
+
+/** 旧形式（L_<タスクID> のプロパティ）を索引へ移して削除する。15分ごとの refreshJob から呼ぶ（無ければ何もしない） */
+function migratePatrolIndex_() {
+  const pr = PropertiesService.getScriptProperties();
+  const legacy = Object.keys(pr.getProperties()).filter(k => k.indexOf('L_') === 0);
+  if (!legacy.length) return 0;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const props = pr.getProperties();
+    const dates = patrolIndexGet_();
+    legacy.forEach(k => { const id = k.slice(2); if (!(dates[id] >= props[k])) dates[id] = props[k]; });
+    persistPut_('L', JSON.stringify(dates));
+    legacy.forEach(k => pr.deleteProperty(k));
+  } finally {
+    lock.releaseLock();
+  }
+  return legacy.length;
+}
+
+/** 手動実行用：旧形式の巡回索引をすぐに移す（通常は15分以内に自動で移る） */
+function migratePatrolIndex() {
+  Logger.log('移した部屋：' + migratePatrolIndex_() + '件 / 索引の件数：' + Object.keys(patrolIndexGet_()).length + '件');
 }
 
 /** 手動実行用：Asanaコメントから巡回索引を作り直す（募集中の全タスクを走査） */
@@ -945,6 +986,7 @@ function installManagementTrigger() { installTriggers(); } // 旧名
 
 /** 15分ごと：Asanaから取り直して「最後に正常なデータ」を更新する。失敗が続いたら通知 */
 function refreshJob() {
+  try { migratePatrolIndex_(); } catch (e) { console.warn('巡回索引の移行：' + e.message); }
   try {
     refreshSnapshot_();
   } catch (e) {
@@ -1057,7 +1099,7 @@ function patrolPhotos_(body) {
 function exportSettingsForMigration() {
   const all = PropertiesService.getScriptProperties().getProperties();
   const out = {};
-  Object.keys(all).forEach(k => { if (!/^(X_|STATUS_|ALERTED_|PATROL_FIELDS$)/.test(k)) out[k] = all[k]; });
+  Object.keys(all).forEach(k => { if (!/^(X_(?!L_)|STATUS_|ALERTED_|PATROL_FIELDS$)/.test(k)) out[k] = all[k]; }); // X_L_（巡回索引）は移す
   Logger.log('移す設定：' + Object.keys(out).length + '件（' + Object.keys(out).filter(k => !/^[LM]_/.test(k)).join(', ') + ' ほか）');
   Logger.log(Utilities.base64Encode(JSON.stringify(out), Utilities.Charset.UTF_8));
 }
