@@ -82,10 +82,13 @@
     const rate = (R?.areas?.[area]?.occ ?? 0) * 100;
     return `<div class="bar-row"><span>${area}</span><div class="track"><div class="fill" style="width:${managementCurrent ? Math.max(0,Math.min(100,rate)) : 0}%"></div></div><strong>${occupancy(R?.areas?.[area])}</strong></div>`;
   }).join('');
+  // 原状回復完了は直近7日間に完了したものだけ扱う（全体の未照合件数・原状回復ページ共通）
+  const recentFrom = Date.now() - 7 * 86400000;
+  const recentRestorations = data.restorations.filter(row => Date.parse(row.at) >= recentFrom);
   el('exceptions').innerHTML = [
     ['①〜④に分類できない', total.other],
     ['地区・管理種別が集計対象外', excluded],
-    ['14日ルール完了・募集中で未照合', data.restorations.filter(x => !data.vacancies.some(y => norm(x.p)===norm(y.p) && norm(x.r)===norm(y.r))).length]
+    ['14日ルール完了（直近1週間）・募集中で未照合', recentRestorations.filter(x => !data.vacancies.some(y => norm(x.p)===norm(y.p) && norm(x.r)===norm(y.r))).length]
   ].map(([label,n]) => `<div class="exception-row"><span>${esc(label)}</span><strong>${fmt(n)}件</strong></div>`).join('');
   const summaryRows = [];
   for (const area of areas) {
@@ -112,9 +115,6 @@
   ['area-filter','status-filter','search'].forEach(id => el(id).addEventListener(id==='search'?'input':'change', renderListings));
   renderListings();
 
-  // 原状回復完了は直近7日間に完了したものだけ表示する
-  const recentFrom = Date.now() - 7 * 86400000;
-  const recentRestorations = data.restorations.filter(row => Date.parse(row.at) >= recentFrom);
   el('completed-count').textContent = `${recentRestorations.length}件`;
   el('reflected-count').textContent = `${total['①']}戸`;
   el('restoration-body').innerHTML = recentRestorations.length ? recentRestorations.map(row => {
