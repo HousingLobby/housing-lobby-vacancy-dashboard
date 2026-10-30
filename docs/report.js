@@ -155,7 +155,7 @@
         photos = photos.filter(Boolean);
       } catch {}
       btn.textContent = '作成中…';
-      const blob = await window.ReportDocx.build(lastData, {patrol, photos});
+      const blob = await window.ReportDocx.build(lastData, {patrol, photos, suumo: lastSuumo});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `募集状況のご報告_${lastData.property || ''}${lastData.room || ''}_${(lastData.to || '').replace(/-/g, '')}.docx`;
