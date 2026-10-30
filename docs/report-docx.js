@@ -110,11 +110,10 @@
     if (d.vacantDays != null) body.push(p(`ご退去（${jpDate(d.moveOut)}）から${d.vacantDays}日が経過しています。`));
     // SUUMOでの見られ方（掲載物件レポートを取り込んだ部屋だけ。数字の事実だけで、良し悪しの評価は書かない）
     const su = extra.suumo;
-    if (su && su.list != null) {
+    if (su && su.detail != null) {
       const perDay = v => v == null ? '' : `（1日あたり約${(Math.round(v * 10) / 10).toFixed(1)}回）`;
       body.push(p(`SUUMOでの閲覧状況（${jpDate(su.date)}時点・掲載${su.days == null ? '' : `${su.days}日間`}の合計）`, {bold: true}));
       body.push(table(['項目', '回数'], [
-        ['物件一覧に表示された回数', `${su.list}回${perDay(su.listDay)}`],
         ['お部屋の詳細ページが見られた回数', `${su.detail == null ? '―' : su.detail + '回'}${perDay(su.detailDay)}`],
         ['SUUMOからのお問い合わせ', `${su.inq == null ? '―' : su.inq + '件'}`]
       ], [6400, 3200]));
@@ -171,7 +170,7 @@
     body.push(h2(`${n()}. 次回のご報告`));
     body.push(para([run('次回は'), memo(`${jpDate(addDays(today, 14))}ごろ`), run('にご報告いたします。')]));
     body.push(p('ご不明な点やご要望がございましたら、担当までお気軽にお申し付けください。引き続きよろしくお願い申し上げます。', {after: 200}));
-    body.push(p(`※お問い合わせの件数は当社の記録にもとづきます。${su && su.list != null ? 'SUUMOの閲覧状況はSUUMOの掲載物件レポートの数値です（お問い合わせの数え方が当社の記録と異なる場合があります）。' : ''}成約状況は当社が把握している事例にもとづく目安です。`, {size: 8.5, color: '7A8D9A'}));
+    body.push(p(`※お問い合わせの件数は当社の記録にもとづきます。${su && su.detail != null ? 'SUUMOの閲覧状況はSUUMOの掲載物件レポートの数値です（お問い合わせの数え方が当社の記録と異なる場合があります）。' : ''}成約状況は当社が把握している事例にもとづく目安です。`, {size: 8.5, color: '7A8D9A'}));
 
     const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
     const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr>${FONT}<w:sz w:val="21"/><w:lang w:val="en-US" w:eastAsia="ja-JP"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="80" w:line="300" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>`
