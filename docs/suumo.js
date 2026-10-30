@@ -82,8 +82,8 @@
       const data = window.DASH && window.DASH.data;
       const matched = data ? data.vacancies.filter(v => res.suumo.rooms[key(v.p, v.r)] && res.suumo.rooms[key(v.p, v.r)].date === rep.date).length : null;
       msg.textContent = res.skipped
-        ? `${rep.date.replace(/-/g, '/')}のレポートは取り込み済みのため、反映しませんでした。`
-        : `${rep.date.replace(/-/g, '/')}のレポートを取り込みました（${res.updated}部屋${matched == null ? '' : `、うち【募集中】の空室 ${matched}部屋`}）。各部屋のページに表示されます。`;
+        ? `${rep.date.replace(/-/g, '/')}のレポートの部屋は、すべて同じ日付の値が取り込み済みのため、反映しませんでした。`
+        : `${rep.date.replace(/-/g, '/')}のレポートを取り込みました（${res.updated}部屋${matched == null ? '' : `、うち【募集中】の空室 ${matched}部屋`}${res.dup ? `。同じ日付の値がある ${res.dup}部屋は反映していません` : ''}）。各部屋のページに表示されます。`;
       showLast(res.suumo);
     } catch (e) { msg.textContent = `取り込めませんでした：${e.message}`; }
     input.value = '';

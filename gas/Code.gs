@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-29-suumo';
+const APP_VERSION = '2026-10-30-suumo-room';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -1909,23 +1909,23 @@ function suumoImport_(body) {
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     const store = suumoGet_();
-    if (store.dates.indexOf(date) >= 0) return {ok: true, skipped: true, date: date, suumo: store};
-    let updated = 0;
+    let updated = 0, dup = 0; // 重複は部屋ごとに判定（1部屋だけのレポートを先に入れても、同じ日の全件を後から取り込める）
     rows.forEach(r => {
       const p = hankyoClean_(r.p, 80), room = hankyoClean_(r.r, 20);
       if (!p) return;
       const key = suumoKey_(p, room);
       const cur = store.rooms[key];
-      if (cur && cur.date > date) return; // より新しいレポートの値を残す
+      if (cur && cur.date >= date) { dup++; return; } // 同じ日付は反映しない・より新しいレポートの値を残す
       store.rooms[key] = {date: date, p: p, r: room, listed: Boolean(r.listed), days: num(r.days),
         list: num(r.list), listDay: num(r.listDay), detail: num(r.detail), detailDay: num(r.detailDay), inq: num(r.inq)};
       updated++;
     });
-    store.dates = store.dates.concat(date).sort().slice(-60);
+    if (!updated) return {ok: true, skipped: true, date: date, updated: 0, dup: dup, suumo: store};
+    if (store.dates.indexOf(date) < 0) store.dates = store.dates.concat(date).sort().slice(-60);
     const keepFrom = addDays_(date, -180); // 半年以上レポートに出てこない部屋は消す（容量を増やし続けない）
     Object.keys(store.rooms).forEach(k => { if (store.rooms[k].date < keepFrom) delete store.rooms[k]; });
     persistPut_('SU', JSON.stringify(store));
-    return {ok: true, skipped: false, date: date, updated: updated, suumo: store};
+    return {ok: true, skipped: false, date: date, updated: updated, dup: dup, suumo: store};
   } finally { lock.releaseLock(); }
 }
 
