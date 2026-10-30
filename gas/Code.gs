@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-10-30-suumo-room';
+const APP_VERSION = '2026-10-30-mgmt-tab';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -1016,11 +1016,16 @@ function importManagementFromMeetingDoc() {
     done.push('ダッシュボード：登録しました');
   }
   // ② 入居率週報　③ HP報告シート
-  try { done.push('入居率週報：' + writeWeeklyManagement_(token, year, actualMonth, areas)); } catch (e) { errors.push('入居率週報：' + e.message); }
+  // 実績月タブは「最終」（G列）。反映した日の月のタブ（当月タブ）にも、まだ来ていない週の列とG列に入れる（2026-10-30 オーナー決定）
+  const today = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
+  const ty = Number(today.slice(0, 4)), tm = Number(today.slice(5, 7));
+  const sameTab = ty === year && tm === actualMonth;
+  if (!sameTab) { try { done.push('入居率週報：' + writeWeeklyManagement_(token, year, actualMonth, areas)); } catch (e) { errors.push('入居率週報：' + e.message); } }
+  try { done.push('入居率週報（当月）：' + writeWeeklyManagement_(token, ty, tm, areas, {cols: weeklyOpenColumns_(ty, tm, today), optional: true})); } catch (e) { errors.push('入居率週報（当月）：' + e.message); }
   try { done.push('HP報告シート：' + writeHpManagement_(token, year, actualMonth, total)); } catch (e) { errors.push('HP報告シート：' + e.message); }
 
   Logger.log(month + '（' + file.name + '）\n' + done.concat(errors).join('\n'));
-  if (done.some(x => !/変更なし$/.test(x)) || errors.length) {
+  if (done.some(x => !/(変更なし|書きません)/.test(x)) || errors.length) {
     notifyAdmin_('管理戸数を自動反映しました' + (errors.length ? '（一部できませんでした）' : ''),
       month + ' の管理戸数を ' + file.name + ' から反映しました（サブ' + sum('sub') + '・一般' + sum('general') + '・合計' + total + '）。\n\n' + done.join('\n') +
       (errors.length ? '\n\n反映できなかったもの（見出しや場所を確認してください）：\n' + errors.join('\n') : ''), errors.length ? 'mgmt_write' : null);
@@ -1029,14 +1034,34 @@ function importManagementFromMeetingDoc() {
 }
 
 /** 入居率週報：実績月のタブ「【新書式】YYYY年M月入居率進捗表」の G列（最終）の8セルに、エリア別の管理戸数を入れる。小計・合計の行は数式なので触らない */
-function writeWeeklyManagement_(token, year, month, areas) {
+/** 週報の管理戸数の列（C〜F＝1w〜4w、G＝最終）のうち、まだ来ていない週の列とG列。1w〜4w＝その月の4日以降の日曜日を順に4つ（日次フローと同じ） */
+function weeklyOpenColumns_(year, month, todayYmd) {
+  const first = new Date(year, month - 1, 4);
+  first.setDate(4 + (7 - first.getDay()) % 7);
+  const cols = [];
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(first.getFullYear(), first.getMonth(), first.getDate() + i * 7);
+    const ymd = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    if (ymd >= todayYmd) cols.push('CDEF'[i]);
+  }
+  return cols.concat('G');
+}
+
+/** 入居率週報：指定月のタブの管理戸数（8セル×cols の列）に入れる。見出しを確認し、同じ値なら書かない。
+ *  opt.cols：書く列（既定は G＝最終だけ）。opt.optional：タブが無ければ書かずに終える（当月タブ用） */
+function writeWeeklyManagement_(token, year, month, areas, opt) {
+  opt = opt || {};
+  const cols = opt.cols || ['G'];
   const t = CFG.weeklyReport;
   const path = '/drives/' + t.driveId + '/items/' + graphItemByPath_(token, t.driveId, t.path).id;
   const ws = (graphGet_(token, path + '/workbook/worksheets').value || []).find(w => {
     const mm = cellText_(w.name).match(/^【新書式】(\d{4})年(\d{1,2})月入居率進捗表$/);
     return mm && Number(mm[1]) === year && Number(mm[2]) === month;
   });
-  if (!ws) throw new Error(year + '年' + month + '月のタブが見つかりません');
+  if (!ws) {
+    if (opt.optional) return 'タブがまだないため書きません（' + year + '年' + month + '月）';
+    throw new Error(year + '年' + month + '月のタブが見つかりません');
+  }
   const v = graphGet_(token, path + wsPath_(ws.name) + "/range(address='A4:G20')").values;
   const row = r => v[r - 4];
   if (cellText_(row(4)[2]) !== '管理戸数' || cellText_(row(5)[6]) !== '最終' || cellText_(row(14)[2]) !== '管理戸数' || !/^(最終|[５5]w)$/.test(cellText_(row(15)[6])))
@@ -1047,12 +1072,14 @@ function writeWeeklyManagement_(token, year, month, areas) {
     if (cellText_(row(r)[1]) !== area || cellText_(row(r)[0]).indexOf(kind === 'sub' ? 'サブ' : '一般') !== 0)
       throw new Error(ws.name.trim() + '：' + r + '行目が「' + area + '・' + (kind === 'sub' ? 'サブ' : '一般') + '」ではありません');
   });
-  if (plan.every(([r, area, kind]) => Number(row(r)[6]) === areas[area][kind]) && plan.every(([r]) => cellText_(row(r)[6]) !== '')) return '変更なし';
+  const ci = c => 'ABCDEFG'.indexOf(c);
+  if (plan.every(([r, area, kind]) => cols.every(c => cellText_(row(r)[ci(c)]) !== '' && Number(row(r)[ci(c)]) === areas[area][kind]))) return '変更なし（' + ws.name.trim() + '）';
+  const from = cols[0]; // cols は G で終わる連続した列（まだ来ていない週は後ろの週から並ぶ）
   [[6, 7], [9, 10], [16, 17], [19, 20]].forEach(([r1, r2]) => {
-    const vals = plan.filter(p => p[0] === r1 || p[0] === r2).map(([, area, kind]) => [areas[area][kind]]);
-    graphPatch_(token, path + wsPath_(ws.name) + "/range(address='G" + r1 + ':G' + r2 + "')", {values: vals});
+    const vals = plan.filter(p => p[0] === r1 || p[0] === r2).map(([, area, kind]) => cols.map(() => areas[area][kind]));
+    graphPatch_(token, path + wsPath_(ws.name) + "/range(address='" + from + r1 + ':G' + r2 + "')", {values: vals});
   });
-  return '書き込みました（' + ws.name.trim() + ' G列）';
+  return '書き込みました（' + ws.name.trim() + ' ' + (cols.length > 1 ? from + '〜G列' : 'G列') + '）';
 }
 
 /** HP報告シート：「年度」「月」の見出しで実績月の列を探し、「管理戸数」の行に合計を入れる。「管理物件数」（棟数）の行は触らない */
