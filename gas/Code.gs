@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-11-01-monthend-gas';
+const APP_VERSION = '2026-11-01-monthend-gas2';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -2063,6 +2063,8 @@ function monthEndCompute_(month) {
   const naiken = wide.filter(x => res(x) === '内見のみ' || res(x) === '申込').length;
   const moushikomi = wide.filter(x => res(x) === '申込').length;
   const dohkou = rows.filter(x => type(x) === '仲介同行');
+  // 仲介業者の案内（種別「仲介同行」＋反響経由が仲介・担当業者が自社以外のもの）＝Teamsの同行報告と照合する対象
+  const brokerVisits = rows.filter(x => type(x) === '仲介同行' || /仲介/.test(x.f[sv.source] || '') || (x.f['1214044050776182'] && x.f['1214044050776182'] !== '自社'));
   const rate = (a, b) => b ? a / b : null;
   const byKeiyu = {};
   wide.forEach(x => { const k = x.f[sv.source] || '未設定'; byKeiyu[k] = (byKeiyu[k] || 0) + 1; });
@@ -2088,7 +2090,7 @@ function monthEndCompute_(month) {
     dohkou: {n: dohkou.length, moushikomi: dohkou.filter(x => res(x) === '申込').length},
     byKeiyu: Object.keys(byKeiyu).map(k => [k, byKeiyu[k]]).sort((a, b) => b[1] - a[1]),
     suumo: {asana: wide.filter(x => x.f[sv.source] === 'SUUMO').length, jds: Object.keys(people).length}, suumoMissing: missing.slice(0, 30),
-    dohkouTeams: null, dohkouAsana: dohkou.length, dohkouMissing: null, notes: notes};
+    dohkouTeams: null, dohkouAsana: brokerVisits.length, dohkouMissing: null, notes: notes};
 }
 
 // Mac側が呼ぶ：依頼があれば返す。対象月にJDSから取り込み済みの反響（SUUMOの照合用）と、店舗ごとの最終取り込み時刻つき
@@ -2108,7 +2110,8 @@ function monthEndWorkerGet_(key) {
     const since = new Date(new Date(start + 'T00:00:00+09:00').getTime() - 60 * 86400000).toISOString();
     const val = (t, gid) => ((t.custom_fields || []).find(f => f.gid === gid) || {}).display_value || '';
     dohkou = asanaList_('/projects/' + sv.project + '/tasks', {completed_since: since, limit: 100, opt_fields: 'name,due_on,custom_fields.gid,custom_fields.display_value'})
-      .filter(t => t.due_on && t.due_on >= start && t.due_on <= end && val(t, sv.type) === '仲介同行')
+      // 他社仲介の案内は、種別「仲介同行」のほか、種別「かってに内見」＋反響経由「仲介業者」や、担当業者が自社以外で登録されていることが多い（2026-11-01確認）
+      .filter(t => t.due_on && t.due_on >= start && t.due_on <= end && (val(t, sv.type) === '仲介同行' || /仲介/.test(val(t, sv.source)) || (val(t, '1214044050776182') && val(t, '1214044050776182') !== '自社')))
       .map(t => ({d: t.due_on, p: val(t, HANKYO_ASANA.property), r: val(t, HANKYO_ASANA.room), v: val(t, '1214044050776182'), name: t.name}));
   } catch (e) { console.warn('仲介同行の取得：' + e.message); }
   return {request: cur, hankyo: items, oldest: oldest, lastChecked: hankyoLastGet__(), counts: hankyoCounts_()[cur.month] || null, dohkouAsana: dohkou};
