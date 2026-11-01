@@ -100,7 +100,7 @@
     for (const key of keys) {
       const c = counts[`${area}|${key}`], r = R?.groups?.[`${area}|${key}`];
       for (const t of Object.keys(sum)) sum[t] += c[t];
-      summaryRows.push(`<tr><td><strong>${area}</strong>　${key==='sub'?'サブ':'一般'}</td>${['①','②','③','④'].map(t => `<td class="num">${pick(c[t], {a: area, s: t})}</td>`).join('')}<td class="num">${c['⑤']}</td><td class="num"><strong>${occupancy(r)}</strong></td><td class="num">${evaluated(r)}</td></tr>`);
+      summaryRows.push(`<tr><td><strong>${area}</strong>　${key==='sub'?'サブ':'一般'}</td>${['①','②','③','④'].map(t => `<td class="num">${pick(c[t], {a: area, s: t, m: key === 'sub' ? 'サブ' : '__general'})}</td>`).join('')}<td class="num">${c['⑤']}</td><td class="num"><strong>${occupancy(r)}</strong></td><td class="num">${evaluated(r)}</td></tr>`);
     }
     // エリア合計（サブ・一般の合算）。率はGASがエリアの管理戸数合計で計算した値
     const ra = R?.areas?.[area];
@@ -122,7 +122,7 @@
   const condValues = crossTable('status-table', '空室状況', condOf, 'c');
   const kindValues = crossTable('kind-table', '管理種別', kindOf, 'm');
   el('cond-filter').insertAdjacentHTML('beforeend', condValues.map(v => `<option>${esc(v)}</option>`).join(''));
-  el('kind-filter').insertAdjacentHTML('beforeend', kindValues.map(v => `<option>${esc(v)}</option>`).join(''));
+  el('kind-filter').insertAdjacentHTML('beforeend', '<option value="__general">一般（一般管理・セキスイ）</option>' + kindValues.map(v => `<option>${esc(v)}</option>`).join(''));
   document.querySelectorAll('[data-bd]').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('[data-bd]').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-selected', on); });
     document.querySelectorAll('[data-bd-panel]').forEach(p => { p.hidden = p.dataset.bdPanel !== b.dataset.bd; });
@@ -138,7 +138,7 @@
   const listingBody = el('listing-body');
   const renderListings = () => {
     const area = el('area-filter').value, status = el('status-filter').value, cond = el('cond-filter').value, kind = el('kind-filter').value, query = norm(el('search').value);
-    const rows = data.vacancies.filter(row => (area==='all'||row.a===area||(area==='other'&&!areas.includes(row.a))) && (status==='all'||category(row)===status) && (cond==='all'||condOf(row)===cond) && (kind==='all'||kindOf(row)===kind) && (!query||norm(`${row.p} ${row.r}`).includes(query)));
+    const rows = data.vacancies.filter(row => (area==='all'||row.a===area||(area==='other'&&!areas.includes(row.a))) && (status==='all'||category(row)===status) && (cond==='all'||condOf(row)===cond) && (kind==='all'||kindOf(row)===kind||(kind==='__general'&&group(row)==='general')) && (!query||norm(`${row.p} ${row.r}`).includes(query)));
     el('listing-count').textContent = `${fmt(rows.length)}件 / 全${fmt(data.vacancies.length)}件`;
     listingBody.innerHTML = rows.length ? rows.map(row => `<tr><td><a class="room-link" href="${roomUrl(row.id)}">${esc(row.p||'物件名なし')} ${esc(row.r||'号室なし')}</a></td><td>${esc(row.a||'地区なし')}</td><td>${esc(row.m||'種別なし')}</td><td>${category(row)==='other'?badge('要確認','warn'):badge(category(row),category(row)==='①'?'good':'muted')}</td><td>${esc(row.c||'空欄')}</td><td><a href="${taskUrl(row.id)}" target="_blank" rel="noopener noreferrer">開く ↗</a></td></tr>`).join('') : '<tr><td colspan="6" class="empty">該当する物件はありません</td></tr>';
   };
