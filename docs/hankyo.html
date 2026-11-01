@@ -14,7 +14,7 @@
   <script defer src="api.js?v=20261101h"></script>
   <script defer src="nav.js?v=20261022"></script>
   <script defer src="monthend.js?v=20261022n"></script>
-  <script defer src="hankyo.js?v=20261101j"></script>
+  <script defer src="hankyo.js?v=20261101k"></script>
 </head>
 <body data-page="hankyo">
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
@@ -29,8 +29,16 @@
     <section id="list-view">
       <div class="section-heading"><div><p class="eyebrow">INQUIRIES</p><h1>反響対応</h1></div><p class="section-meta" id="keep-note"></p></div>
       <div class="hk-counts" id="counts"></div>
+      <div class="panel hk-bm">
+        <div class="panel-heading"><h2>JDSの反響を取り込む（ブックマーク）</h2><span>Windows・Macどちらでも／Edge・Chrome</span></div>
+        <p style="margin:0 0 8px"><a class="secondary-button" style="display:inline-block;text-decoration:none" href="jds-guide.html" target="_blank" rel="noopener">▶ イラストで手順を見る（PDF保存もできます）</a></p>
+        <p style="margin:0 0 8px;font-size:.9rem">① 下のボタンを、ブラウザの<b>ブックマークバーにドラッグ</b>して登録します（最初の1回だけ）。<br>② <b>JDSにログイン</b>した状態で、JDSのページを開いたまま、そのブックマークを押します。<br>③ 新しいタブが開き、新しい反響だけがダッシュボードに登録されます（数秒）。</p>
+        <a class="primary-button" id="bookmarklet" style="display:inline-block;text-decoration:none" href="javascript:(function(){var s=document.createElement('script');s.src='https://housinglobby.github.io/housing-lobby-vacancy-dashboard/jds-import.js?t='+Date.now();document.body.appendChild(s)})();">JDS反響を取り込む</a>
+        <span class="footnote" style="margin-left:8px">← ドラッグして登録（ここでは押さないでください）</span>
+        <p class="footnote" style="margin:8px 0 0">ログインしている店舗（長崎店／県央店）の反響だけが対象です。取り込むと、Asana「セルフ内見予約表」に無い反響は<b>自動で登録</b>します（同じ人のタスクがあれば作りません）。メールの送信・JDSへの書き込みはしません。</p>
+      </div>
       <div class="panel hk-check">
-        <div class="panel-heading"><h2>反響データ確認</h2><span>JDSの反響を取り込みます</span></div>
+        <div class="panel-heading"><h2>Macで取り込む（予備）</h2><span>ブックマークが使えないとき</span></div>
         <p class="notice" style="margin:0 0 12px">※JDSサイトにログインしてください（ログインしたあとにボタンを押してください）<br>※長崎店と県央店（諫早店）はJDSのログインが別です。店舗ごとにログインして、それぞれボタンを押してください。</p>
         <div class="hk-last" id="check-last"></div>
         <div class="button-row"><button type="button" class="primary-button" id="check-btn">反響データ確認</button><span class="save-message" id="check-status" role="status"></span></div>
@@ -44,17 +52,9 @@
         <p class="footnote" style="margin:8px 0 0">押すと、①Asana「セルフ内見予約表」の反響数・内見率・成約率、②JDSから取り込み済みの反響とAsanaの照合（SUUMOの登録漏れ）、③Teams「リーシング」の同行報告とAsanaの照合を行い、結果をここに表示します（数分かかります）。<b>先に上の「反響データ確認」を長崎店・県央店の両方で実行しておくと、SUUMOの漏れを正確に確認できます。</b>Asanaには書き込みません。</p>
         <div id="me-result" hidden></div>
       </div>
-      <div class="panel hk-bm">
-        <div class="panel-heading"><h2>自分のPCから取り込む（ブックマーク）</h2><span>Windows・Macどちらでも／Edge・Chrome</span></div>
-        <p style="margin:0 0 8px"><a class="secondary-button" style="display:inline-block;text-decoration:none" href="jds-guide.html" target="_blank" rel="noopener">▶ イラストで手順を見る（PDF保存もできます）</a></p>
-        <p style="margin:0 0 8px;font-size:.9rem">① 下のボタンを、ブラウザの<b>ブックマークバーにドラッグ</b>して登録します（最初の1回だけ）。<br>② <b>JDSにログイン</b>した状態で、JDSのページを開いたまま、そのブックマークを押します。<br>③ 新しいタブが開き、新しい反響だけがダッシュボードに登録されます（数秒）。</p>
-        <a class="primary-button" id="bookmarklet" style="display:inline-block;text-decoration:none" href="javascript:(function(){var s=document.createElement('script');s.src='https://housinglobby.github.io/housing-lobby-vacancy-dashboard/jds-import.js?t='+Date.now();document.body.appendChild(s)})();">JDS反響を取り込む</a>
-        <span class="footnote" style="margin-left:8px">← ドラッグして登録（ここでは押さないでください）</span>
-        <p class="footnote" style="margin:8px 0 0">ログインしている店舗（長崎店／県央店）の反響だけが対象です。取り込むと、Asana「セルフ内見予約表」に無い反響は<b>自動で登録</b>します（同じ人のタスクがあれば作りません）。メールの送信・JDSへの書き込みはしません。</p>
-      </div>
       <div class="panel">
         <div class="panel-heading"><h2>お客様一覧</h2><span id="list-count"></span></div>
-        <div class="filters"><label>状態<select id="state-filter"><option value="all">すべて</option><option value="未返信">未返信</option><option value="返信済">返信済</option><option value="asana-missing">Asana未登録</option></select></label><label class="search-field">お客様名・物件名<input id="search" type="search" placeholder="名前や物件名で検索"></label></div>
+        <div class="filters"><label>店舗<select id="store-filter"><option value="all">すべて</option><option value="B">長崎店</option><option value="A">諫早店</option></select></label><label>状態<select id="state-filter"><option value="all">すべて</option><option value="未返信">未返信</option><option value="返信済">返信済</option><option value="asana-missing">Asana未登録</option></select></label><label class="search-field">お客様名・物件名<input id="search" type="search" placeholder="名前や物件名で検索"></label></div>
         <div class="table-scroll"><table class="list-table"><thead><tr><th>受付日</th><th>お客様</th><th>お問い合わせ物件</th><th>店舗</th><th>返信文</th><th>状態</th><th>Asana</th></tr></thead><tbody id="list-body"></tbody></table></div>
       </div>
       <p class="footnote">お客様の情報（氏名・メール・電話・返信文）は受付日から40日で自動削除されます。月ごとの件数だけが残ります。メールの送信はこの画面では行いません。</p>

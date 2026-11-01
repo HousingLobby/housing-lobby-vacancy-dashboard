@@ -23,11 +23,19 @@
   }
 
   function renderList() {
-    const st = $('state-filter').value, q = $('search').value.trim().toLowerCase();
-    const rows = list.items.filter(r => (st === 'all' || r.state === st || (st === 'asana-missing' && asana && asana[r.id] && !asana[r.id].registered)) && (!q || `${r.name} ${r.property} ${r.room}`.toLowerCase().includes(q)));
+    const st = $('state-filter').value, sf = $('store-filter').value, q = $('search').value.trim().toLowerCase();
+    const rows = list.items.filter(r => (st === 'all' || r.state === st || (st === 'asana-missing' && asana && asana[r.id] && !asana[r.id].registered)) && (sf === 'all' || r.store === sf) && (!q || `${r.name} ${r.property} ${r.room}`.toLowerCase().includes(q)));
     $('list-count').textContent = `${rows.length}件（保存中 ${list.items.length}件）`;
-    $('list-body').innerHTML = rows.length ? rows.map(r => `<tr class="hk-row"><td>${esc(r.date)}</td><td><a href="#${encodeURIComponent(r.id)}">${esc(r.name || '（名前なし）')}</a></td><td>${esc(r.property)} ${esc(r.room)}</td><td>${esc(STORE[r.store] || r.store)}</td><td>${r.hasReply ? '<span class="badge good">あり</span>' : '<span class="badge muted">なし</span>'}</td><td><span class="badge ${r.state === '返信済' ? 'good' : 'warn'}">${esc(r.state)}</span></td><td>${asanaBadge(r.id)}</td></tr>`).join('') : '<tr><td colspan="7" class="empty">該当する反響はありません</td></tr>';
+    $('list-body').innerHTML = rows.length ? rows.map(r => `<tr class="hk-row"><td>${esc(r.date)}</td><td><a href="#${encodeURIComponent(r.id)}">${esc(r.name || '（名前なし）')}</a></td><td>${esc(r.property)} ${esc(r.room)}</td><td>${esc(STORE[r.store] || r.store)}</td><td>${r.hasReply ? '<span class="badge good">あり</span>' : '<span class="badge muted">なし</span>'}</td><td><span class="badge ${r.state === '返信済' ? 'good' : 'warn'}">${esc(r.state)}</span>${lateBadge(r)}</td><td>${asanaBadge(r.id)}</td></tr>`).join('') : '<tr><td colspan="7" class="empty">該当する反響はありません</td></tr>';
     document.querySelectorAll('.hk-row').forEach(tr => tr.addEventListener('click', e => { if (e.target.tagName !== 'A') location.hash = tr.querySelector('a').getAttribute('href'); }));
+  }
+
+  // 未返信のまま受付日から日がたったものを目立たせる（受付日は日付だけのため、翌日以降を「◯日経過」とする）
+  const todayIso = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  function lateBadge(r) {
+    if (r.state === '返信済' || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.date))) return '';
+    const days = Math.round((Date.parse(todayIso()) - Date.parse(r.date)) / 86400e3);
+    return days >= 1 ? ` <span class="badge" style="color:#b42318;background:#fde8e6">${days}日経過</span>` : '';
   }
 
   // ---- Asana（セルフ内見予約表）への登録状況と登録（2026-11-01）
@@ -139,7 +147,7 @@
       const a = r.asana || {};
       const asanaText = a.error ? `Asanaへの自動登録はできませんでした（${a.error}）。一覧の「Asana」欄から登録してください。`
         : `Asana：新しく${(a.registered || []).length}件を登録${a.already ? `（${a.already}件はすでにありました）` : ''}${(a.failed || []).length ? `。${a.failed.length}件は登録できなかったため、一覧の「Asana」欄から登録してください` : ''}。`;
-      say(`${store}：JDSの${msg.items.length}件のうち、新規${r.added}件を取り込みました（残り${Math.max(0, msg.items.length - r.added)}件は、すでに登録済みか、読み取れなかったためそのままです）。${asanaText}`);
+      say(`${store}：JDSの${msg.items.length}件のうち、新規${r.added}件を取り込みました（残り${Math.max(0, msg.items.length - r.added)}件は、すでに登録済みか、読み取れなかったためそのままです）。${r.replied ? `JDSのコメント欄で対応済みの${r.replied}件を「返信済」にしました。` : ''}${asanaText}`);
       $('import-done').hidden = false; list = null;
     } catch (e) { say('取り込めませんでした：' + e.message, true); }
     importing = false;
@@ -148,7 +156,8 @@
   // 返信文のテンプレート（/suumo スキルと同じ文面）。空室かどうかは担当者がリアプロBBで確認して選ぶ
   const SIGN = ['◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆', '〒850-0004', '長崎県長崎市下西山町1-5', '株式会社ハウジングロビー', 'TEL | 095-893-5056', 'FAX | 095-893-5057', 'https://www.h-lobby.jp/', '◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆'].join('\n');
   const LINE = 'https://line.me/R/ti/p/@291ytred';
-  const splitRoom = prop => { const m = String(prop || '').match(/^(.*?)\s*([0-9０-９]{2,4})$/); return m ? {prop: m[1], room: m[2]} : {prop: String(prop || ''), room: ''}; };
+  // 物件名の末尾の号室を分ける（表記はJDSの全角のまま）：402／Ｂ１０２／１０２Ａ／402号室 など
+  const splitRoom = prop => { const m = String(prop || '').trim().match(/^(.*?)[\s・\-－‐]*([0-9０-９]{2,4}[A-Za-zＡ-Ｚａ-ｚ]?|[A-Za-zＡ-Ｚａ-ｚ][\-－‐]?[0-9０-９]{1,3})(?:号室|号)?$/); return m && m[1] ? {prop: m[1], room: m[2]} : {prop: String(prop || ''), room: ''}; };
   const mdOf = iso => { const [y, mo, d] = iso.split('-').map(Number); const dt = new Date(Date.UTC(y, mo - 1, d + 2)); return `${dt.getUTCMonth() + 1}/${dt.getUTCDate()}`; };
   function makeReply(k) {
     const name = (current.name || 'お客様').replace(/様\s*$/, '') + '様';
@@ -159,7 +168,7 @@
     }
     const state = k.kind === 'soon' ? `こちらのお部屋は現在入居中のため、ご内見可能時期は${k.date ? mdOf(k.date) : '○/○'}以降となります。` : 'こちら現在空室となっております。';
     const lp = k.lp.trim() ? `\nお部屋の写真や周辺環境は、こちらのページでもご覧いただけます！\n${k.lp.trim()}\n` : '';
-    return `${head}\n${state}\n物件の資料をお送りいたしますのでご確認くださいませ。\n${lp}\n★内見予約の受付は公式LINEにて行っております。（当社管理物件のみ）\n弊社ではお客様のみでお部屋を見ていただく“かってに内見（セルフ内見）”\nを行っております。\n\nかってに内見ご利用で【仲介手数料が50％off！】となっております。\n※3分程度の簡単なアンケートにご回答いただくことが条件です。\n\nかってに内見のご登録はコチラから！\n　　　　　↓ ↓ ↓\n${LINE}\n（利用時間：9:00〜18:00）\n\n是非よろしくお願いします！\n\n${SIGN}`;
+    return `${head}\n${state}\n物件情報をお送りいたしますのでご確認くださいませ。\n${lp}\n★内見予約の受付は公式LINEにて行っております。（当社管理物件のみ）\n弊社ではお客様のみでお部屋を見ていただく“かってに内見（セルフ内見）”\nを行っております。\n\nかってに内見ご利用で【仲介手数料が50％off！】となっております。\n※3分程度の簡単なアンケートにご回答いただくことが条件です。\n\nかってに内見のご登録はコチラから！\n　　　　　↓ ↓ ↓\n${LINE}\n（利用時間：9:00〜18:00）\n\n是非よろしくお願いします！\n\n${SIGN}`;
   }
   function fillTplForm(d) {
     const sp = d.room ? {prop: d.property, room: d.room} : splitRoom(d.property);
@@ -199,8 +208,16 @@
   }
   function syncTplKind() { const k = $('tpl-kind').value; $('tpl-date-wrap').hidden = k !== 'soon'; $('tpl-other-wrap').hidden = k !== 'no'; }
 
+  // 返信文を直して保存していないか（一覧に戻る・タブを閉じる前に確認する）
+  const dirty = () => Boolean(current) && !$('detail-view').hidden && $('d-reply').value !== (current.reply || '');
+  let shownHash = '';
   async function route() {
     const id = decodeURIComponent(location.hash.slice(1));
+    if (shownHash && id !== shownHash && dirty()) {
+      if (!confirm('返信文の手直しが保存されていません。保存せずに移動しますか？')) { history.pushState(null, '', '#' + encodeURIComponent(shownHash)); return; }
+      current = null;
+    }
+    shownHash = id;
     if (id === 'import') { runImport(); return; }
     $('import-view').hidden = true;
     $('list-view').hidden = Boolean(id); $('detail-view').hidden = !id;
@@ -245,6 +262,8 @@
     $('d-toggle').addEventListener('click', async () => { const next = current.state === '返信済' ? '未返信' : '返信済'; if (await save({state: next}, `「${next}」にしました`)) renderDetail({...current, state: next}); });
     $('back-link').addEventListener('click', e => { if (location.hash) { e.preventDefault(); location.hash = ''; } });
     window.addEventListener('hashchange', route);
+    window.addEventListener('beforeunload', e => { if (dirty()) { e.preventDefault(); e.returnValue = ''; } });
+    $('store-filter').addEventListener('change', () => list && renderList());
     (window.Auth ? window.Auth.ready : Promise.resolve()).then(route);
   });
 })();
