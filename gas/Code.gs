@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-11-01-hankyo-fix3';
+const APP_VERSION = '2026-11-01-monthend-gas';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -2018,14 +2018,77 @@ function monthEndPut__(o) { PropertiesService.getScriptProperties().setProperty(
 
 function monthEndStatus_() { return {monthEnd: monthEndGet__(), result: monthEndResultGet__(), lastChecked: hankyoLastGet__()}; }
 
+// ボタンを押したら、①Asanaの反響集計 ②SUUMOの登録漏れ はここ（GAS）ですぐ計算して返す（2026-11-01）。
+// ③Teams「リーシング」の仲介同行の照合だけは、Mac側の処理役が後から行い、結果に書き足す（Teamsはこちらから読めないため）
 function monthEndRequest_(body) {
   const month = String(body.month || '');
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('対象月が正しくありません');
+  const result = monthEndCompute_(month);
+  result.teamsPending = true;
+  PropertiesService.getScriptProperties().setProperty('MONTHEND_RESULT', JSON.stringify(monthEndFit_(result)));
   const cur = monthEndGet__();
-  if (cur && (cur.state === '依頼中' || (cur.state === '実行中' && Date.now() - new Date(cur.at).getTime() < 40 * 60000))) return {monthEnd: cur};
-  const o = {state: '依頼中', month: month, at: new Date().toISOString(), by: CURRENT_USER ? CURRENT_USER.name : ''};
-  monthEndPut__(o);
-  return {monthEnd: o};
+  // Teamsの照合を依頼（すでに同じ月を処理中なら重ねない）
+  let o = cur;
+  if (!(cur && cur.month === month && (cur.state === '依頼中' || (cur.state === '実行中' && Date.now() - new Date(cur.at).getTime() < 40 * 60000)))) {
+    o = {state: '依頼中', month: month, at: new Date().toISOString(), by: CURRENT_USER ? CURRENT_USER.name : '', phase: 'teams'};
+    monthEndPut__(o);
+  }
+  return {monthEnd: o, result: monthEndResultGet__()};
+}
+
+// プロパティは1つ9KBまで。超えるときは漏れ候補の一覧を短くする
+function monthEndFit_(r) {
+  let txt = JSON.stringify(r);
+  ['suumoMissing', 'dohkouMissing'].forEach(k => { while (txt.length > 8500 && Array.isArray(r[k]) && r[k].length > 5) { r[k] = r[k].slice(0, r[k].length - 5); r[k + 'Cut'] = true; txt = JSON.stringify(r); } });
+  if (txt.length > 8800) throw new Error('結果が大きすぎます');
+  return r;
+}
+
+// ①Asana（セルフ内見予約表）の反響集計と ②SUUMO登録漏れ（取り込み済みのJDS反響との照合）。読み取りのみ
+function monthEndCompute_(month) {
+  const sv = CFG.selfViewing;
+  const start = month + '-01';
+  const y = Number(month.slice(0, 4)), m = Number(month.slice(5, 7));
+  const end = Utilities.formatDate(new Date(y, m, 0), 'Asia/Tokyo', 'yyyy-MM-dd');
+  const since = new Date(new Date(start + 'T00:00:00+09:00').getTime() - 60 * 86400000).toISOString();
+  const fieldOf = t => { const o = {}; (t.custom_fields || []).forEach(f => { o[f.gid] = f.display_value || ''; }); return o; };
+  const all = asanaList_('/projects/' + sv.project + '/tasks', {completed_since: since, limit: 100,
+    opt_fields: 'name,due_on,custom_fields.gid,custom_fields.display_value'});
+  const seen = {};
+  const rows = all.filter(t => !seen[t.gid] && (seen[t.gid] = true) && t.due_on && t.due_on >= start && t.due_on <= end)
+    .map(t => ({t: t, f: fieldOf(t)}))
+    .filter(x => String(x.t.name || '').trim() || x.f[sv.type] || x.f[HANKYO_ASANA.property]); // 名前も主要項目も空の登録エラーは除く
+  const type = x => x.f[sv.type], res = x => x.f[sv.result];
+  const wide = rows.filter(x => type(x) === '反響' || type(x) === 'かってに内見');
+  const naiken = wide.filter(x => res(x) === '内見のみ' || res(x) === '申込').length;
+  const moushikomi = wide.filter(x => res(x) === '申込').length;
+  const dohkou = rows.filter(x => type(x) === '仲介同行');
+  const rate = (a, b) => b ? a / b : null;
+  const byKeiyu = {};
+  wide.forEach(x => { const k = x.f[sv.source] || '未設定'; byKeiyu[k] = (byKeiyu[k] || 0) + 1; });
+  // ②SUUMO登録漏れ：同じ人（苗字＋受付日）は1件。判定は反響対応ページの「Asana」欄と同じ（受付日±3日、同じ物件なら±14日、苗字一致）
+  const suumoTasks = all.filter(t => t.due_on); // 前後の月のタスクも照合に使う（受付日と期日が月をまたぐことがあるため）
+  const jdsRows = hankyoRows_(hankyoSheet_()).filter(r => String(r['受付日']).slice(0, 7) === month);
+  const people = {}, missing = [];
+  jdsRows.forEach(r => {
+    const k = hankyoSurname_(r['顧客名']) + '|' + r['受付日'];
+    if (people[k]) return;
+    people[k] = true;
+    if (!hankyoAsanaFind_(r, suumoTasks)) missing.push({d: String(r['受付日']), n: String(r['顧客名'] || ''), p: (String(r['物件名'] || '') + ' ' + String(r['号室'] || '')).trim(), s: r['店舗'] === 'A' ? '県央店' : '長崎店'});
+  });
+  missing.sort((a, b) => b.d.localeCompare(a.d));
+  const notes = [];
+  const last = hankyoLastGet__(), monthEndDay = end < todayJst_() ? end : todayJst_();
+  ['B', 'A'].forEach(st => { if (!last[st] || Utilities.formatDate(new Date(last[st]), 'Asia/Tokyo', 'yyyy-MM-dd') < monthEndDay) notes.push((st === 'A' ? '県央店（諫早）' : '長崎店') + 'のJDS取り込みが古いか未実施です。JDSから取り込んでから、もう一度押してください'); });
+  const oldest = hankyoRows_(hankyoSheet_()).reduce((mn, r) => (!mn || String(r['受付日']) < mn ? String(r['受付日']) : mn), '');
+  if (oldest && start < oldest) notes.push('対象月の一部はJDSの保存期間（40日）を過ぎており、SUUMOの照合ができません');
+  notes.push('アットホームの反響は、Asanaに登録された分だけの数字です');
+  return {month: month, at: new Date().toISOString(), total: wide.length, hankyo: wide.filter(x => type(x) === '反響').length, katteni: wide.filter(x => type(x) === 'かってに内見').length,
+    naiken: naiken, moushikomi: moushikomi, naikenRate: rate(naiken, wide.length), seiyakuRate: rate(moushikomi, wide.length), naikenSeiyakuRate: rate(moushikomi, naiken),
+    dohkou: {n: dohkou.length, moushikomi: dohkou.filter(x => res(x) === '申込').length},
+    byKeiyu: Object.keys(byKeiyu).map(k => [k, byKeiyu[k]]).sort((a, b) => b[1] - a[1]),
+    suumo: {asana: wide.filter(x => x.f[sv.source] === 'SUUMO').length, jds: Object.keys(people).length}, suumoMissing: missing.slice(0, 30),
+    dohkouTeams: null, dohkouAsana: dohkou.length, dohkouMissing: null, notes: notes};
 }
 
 // Mac側が呼ぶ：依頼があれば返す。対象月にJDSから取り込み済みの反響（SUUMOの照合用）と、店舗ごとの最終取り込み時刻つき
@@ -2037,7 +2100,18 @@ function monthEndWorkerGet_(key) {
   const items = all.filter(r => String(r['受付日']).slice(0, 7) === cur.month)
     .map(r => ({id: r.id, date: r['受付日'], name: r['顧客名'], store: r['店舗'], property: r['物件名'], room: r['号室']}));
   const oldest = all.reduce((m, r) => (!m || String(r['受付日']) < m ? String(r['受付日']) : m), '');
-  return {request: cur, hankyo: items, oldest: oldest, lastChecked: hankyoLastGet__(), counts: hankyoCounts_()[cur.month] || null};
+  // Teamsとの照合用：対象月のAsanaの仲介同行タスク（期日・物件名・号室・業者）
+  let dohkou = [];
+  try {
+    const sv = CFG.selfViewing, start = cur.month + '-01', y = Number(cur.month.slice(0, 4)), m = Number(cur.month.slice(5, 7));
+    const end = Utilities.formatDate(new Date(y, m, 0), 'Asia/Tokyo', 'yyyy-MM-dd');
+    const since = new Date(new Date(start + 'T00:00:00+09:00').getTime() - 60 * 86400000).toISOString();
+    const val = (t, gid) => ((t.custom_fields || []).find(f => f.gid === gid) || {}).display_value || '';
+    dohkou = asanaList_('/projects/' + sv.project + '/tasks', {completed_since: since, limit: 100, opt_fields: 'name,due_on,custom_fields.gid,custom_fields.display_value'})
+      .filter(t => t.due_on && t.due_on >= start && t.due_on <= end && val(t, sv.type) === '仲介同行')
+      .map(t => ({d: t.due_on, p: val(t, HANKYO_ASANA.property), r: val(t, HANKYO_ASANA.room), v: val(t, '1214044050776182'), name: t.name}));
+  } catch (e) { console.warn('仲介同行の取得：' + e.message); }
+  return {request: cur, hankyo: items, oldest: oldest, lastChecked: hankyoLastGet__(), counts: hankyoCounts_()[cur.month] || null, dohkouAsana: dohkou};
 }
 
 function monthEndUpdate_(body) {
@@ -2046,11 +2120,13 @@ function monthEndUpdate_(body) {
   const cur = monthEndGet__() || {};
   monthEndPut__({state: body.state, month: cur.month || '', at: new Date().toISOString(), by: cur.by || '', message: hankyoClean_(body.message, 200)});
   if (body.state === '完了' && body.result && typeof body.result === 'object') {
-    let r = body.result, txt = JSON.stringify(r);
-    // プロパティは1つ9KBまで。超えるときは漏れ候補の一覧を短くする
-    ['suumoMissing', 'dohkouMissing'].forEach(k => { while (txt.length > 8500 && Array.isArray(r[k]) && r[k].length > 5) { r[k] = r[k].slice(0, r[k].length - 5); r[k + 'Cut'] = true; txt = JSON.stringify(r); } });
-    if (txt.length > 8800) throw new Error('結果が大きすぎます');
-    PropertiesService.getScriptProperties().setProperty('MONTHEND_RESULT', txt);
+    // Mac側からはTeamsの照合（dohkouTeams・dohkouMissing・notes）だけが来る。GASで計算済みの集計に書き足す
+    const base = monthEndResultGet__();
+    const r = base && base.month === cur.month ? Object.assign({}, base) : {month: cur.month};
+    ['dohkouTeams', 'dohkouMissing'].forEach(k => { if (body.result[k] !== undefined) r[k] = body.result[k]; });
+    if (Array.isArray(body.result.notes)) r.notes = (r.notes || []).concat(body.result.notes.map(n => hankyoClean_(n, 200)));
+    r.teamsPending = false; r.teamsAt = new Date().toISOString();
+    PropertiesService.getScriptProperties().setProperty('MONTHEND_RESULT', JSON.stringify(monthEndFit_(r)));
   }
   return {ok: true};
 }

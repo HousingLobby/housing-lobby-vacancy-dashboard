@@ -94,7 +94,7 @@
     hankyoImport: body => request(null, {action: 'hankyoImport', ...body}, 120000),
     hankyoCheckRequest: () => request(null, {action: 'hankyoCheckRequest'}),
     hankyoCheckStatus: () => request({action: 'hankyoCheckStatus'}),
-    monthEndRequest: month => request(null, {action: 'monthEndRequest', month}),
+    monthEndRequest: month => request(null, {action: 'monthEndRequest', month}, 180000), // 反響集計・SUUMOの確認をその場で計算するので長めに待つ
     monthEndStatus: () => request({action: 'monthEndStatus'}),
     hankyoUpdate: body => request(null, {action: 'hankyoUpdate', ...body}),
     hankyoAsanaCheck: () => request(null, {action: 'hankyoAsanaCheck'}, 90000),

@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  // 月末集計（ボタン→Macのワーカーが集計→結果を表示）。反響対応・入居促進の両ページで共用する
+  // 月末集計。反響の集計とSUUMOの登録漏れはボタンを押すとすぐ出る（GAS）。Teamsの仲介同行の照合だけ、Macの処理役が後から書き足す。反響対応・入居促進の両ページで共用する
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const monthLabel = ym => `${ym.slice(0, 4)}年${Number(ym.slice(5))}月`;
   const pct = v => v == null ? '―' : (Math.round(v * 1000) / 10) + '%';
@@ -22,9 +22,11 @@
       <h4 style="margin:16px 0 6px">SUUMO登録漏れの確認 <span class="badge ${sMiss ? 'warn' : 'good'}">${sMiss ? `漏れ候補 ${sMiss}件` : '漏れなし'}</span></h4>
       <p class="footnote" style="margin:0 0 6px">JDS取り込み済み ${su.jds ?? '―'}件／Asana登録 ${su.asana ?? '―'}件</p>
       ${missList(r.suumoMissing, [['受付日', 'd'], ['お客様', 'n'], ['物件', 'p'], ['店舗', 's']])}${r.suumoMissingCut ? '<p class="footnote">※一部のみ表示</p>' : ''}
-      <h4 style="margin:16px 0 6px">仲介同行の確認 <span class="badge ${dMiss ? 'warn' : 'good'}">${dMiss ? `未登録候補 ${dMiss}件` : '漏れなし'}</span></h4>
+      ${r.teamsPending || r.dohkouMissing == null
+        ? `<h4 style="margin:16px 0 6px">仲介同行の確認 <span class="badge muted">Teamsと照合中</span></h4><p class="footnote" style="margin:0">Asana登録 ${r.dohkouAsana ?? '―'}件。Teams「リーシング」の報告との照合は、Macの処理役が終わりしだいここに出ます。</p>`
+        : `<h4 style="margin:16px 0 6px">仲介同行の確認 <span class="badge ${dMiss ? 'warn' : 'good'}">${dMiss ? `未登録候補 ${dMiss}件` : '漏れなし'}</span></h4>
       <p class="footnote" style="margin:0 0 6px">Teams報告 ${r.dohkouTeams ?? '―'}件／Asana登録 ${r.dohkouAsana ?? '―'}件</p>
-      ${missList(r.dohkouMissing, [['内見日', 'd'], ['業者', 'v'], ['物件・号室', 'p']])}${r.dohkouMissingCut ? '<p class="footnote">※一部のみ表示</p>' : ''}
+      ${missList(r.dohkouMissing, [['内見日', 'd'], ['業者', 'v'], ['物件・号室', 'p']])}${r.dohkouMissingCut ? '<p class="footnote">※一部のみ表示</p>' : ''}`}
       ${(r.notes || []).length ? `<ul class="footnote" style="margin:12px 0 0">${r.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}`;
     box.hidden = false;
   }
@@ -38,9 +40,9 @@
       if (opts.last) opts.last.innerHTML = `<span class="badge ${lastChecked.B ? 'good' : 'warn'}">JDS取り込み 長崎店：${fmt(lastChecked.B)}</span> <span class="badge ${lastChecked.A ? 'good' : 'warn'}">県央店（諫早）：${fmt(lastChecked.A)}</span>`;
       opts.button.disabled = Boolean(busy);
       const t = c && c.at ? fmt(c.at) : '';
-      const text = !c ? '' : {'依頼中': `${monthLabel(c.month)}分を依頼しました。Macの処理が始まるのを待っています…`, '実行中': `${monthLabel(c.month)}分を集計中…（数分かかります）`, '完了': `${t} ${monthLabel(c.month)}分の集計が終わりました`, '失敗': `${t} 集計できませんでした：${c.message || '原因不明'}`}[c.state] || '';
+      const text = !c ? '' : {'依頼中': `${monthLabel(c.month)}分の反響集計とSUUMOの確認が出ました。Teamsの仲介同行の照合は、Macの処理役を待っています…`, '実行中': `${monthLabel(c.month)}分のTeamsの仲介同行を照合中…`, '完了': `${t} ${monthLabel(c.month)}分の集計が終わりました`, '失敗': `${t} Teamsの照合ができませんでした：${c.message || '原因不明'}（反響集計とSUUMOの確認は表示どおり）`}[c.state] || '';
       opts.status.textContent = text; opts.status.className = 'save-message' + (c && c.state === '失敗' ? ' error' : '');
-      renderResult(opts.result, busy ? null : res.result);
+      renderResult(opts.result, res.result); // 反響集計・SUUMOはすぐ出るので、Teamsの照合待ちの間も表示する
       clearTimeout(timer);
       if (busy) timer = setTimeout(refresh, 10000);
     }
@@ -48,8 +50,9 @@
     opts.button.addEventListener('click', async () => {
       try {
         opts.button.disabled = true;
+        opts.status.textContent = '集計しています…（数十秒）'; opts.status.className = 'save-message';
         const r = await Api.monthEndRequest(opts.month());
-        render({monthEnd: r.monthEnd, lastChecked: lastChecked, result: null});
+        render({monthEnd: r.monthEnd, lastChecked: lastChecked, result: r.result || null});
         refresh();
       } catch (e) { opts.button.disabled = false; opts.status.textContent = '依頼できませんでした：' + e.message; opts.status.className = 'save-message error'; }
     });
