@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-11-01-hankyo-asana3';
+const APP_VERSION = '2026-11-01-hankyo-auto';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -1677,7 +1677,9 @@ function hankyoPurge_() {
 // Claude が呼ぶ：items=[{id,date,name,email,tel,store,property,room,message,status,lp,reply}]。idが既にあれば更新、なければ追加（件数は追加時に1回だけ数える）
 function hankyoUpsert_(body) {
   lpWorkerOk_(body.key);
-  return hankyoUpsertCore_(Array.isArray(body.items) ? body.items.slice(0, 50) : [], false);
+  const r = hankyoUpsertCore_(Array.isArray(body.items) ? body.items.slice(0, 50) : [], false);
+  try { r.asana = hankyoAsanaAuto_('反響データ確認（Mac側の取り込み）で自動登録'); } catch (e) { r.asana = {error: String(e.message || e)}; }
+  return r;
 }
 
 // 画面から（ログイン済みの社内ユーザー）：各PCのブラウザでJDSを読み取った反響を取り込む。既にあるidは触らない（追加のみ）
@@ -1689,7 +1691,9 @@ function hankyoImport_(body) {
       property: it.property, room: '', message: it.message, state: /済/.test(String(it.comment || '')) ? '返信済' : '未返信'}));
   const r = hankyoUpsertCore_(ok, true);
   if (store) { const l = hankyoLastGet__(); l[store] = new Date().toISOString(); PropertiesService.getScriptProperties().setProperty('HANKYO_LAST', JSON.stringify(l)); }
-  return {ok: true, added: r.added, skipped: items.length - ok.length + (ok.length - r.added - r.updated), read: items.length};
+  let asana;
+  try { asana = hankyoAsanaAuto_('空室業務ダッシュボードのJDS取り込みで自動登録' + (CURRENT_USER ? '（' + CURRENT_USER.name + '）' : '')); } catch (e) { asana = {error: String(e.message || e)}; }
+  return {ok: true, added: r.added, skipped: items.length - ok.length + (ok.length - r.added - r.updated), read: items.length, asana: asana};
 }
 
 function hankyoUpsertCore_(items, addOnly) {
@@ -1850,21 +1854,80 @@ function hankyoAsanaRegister_(body) {
       if (!r['Asana']) sh.getRange(r.row, HANKYO_HEAD.indexOf('Asana') + 1).setValue(found.gid);
       return {ok: true, already: true, gid: found.gid, name: found.name};
     }
-    const name = hankyoClean_(body.name, 60).trim(), property = hankyoClean_(body.property, 120).trim(), room = hankyoClean_(body.room, 30).trim();
-    if (!/様/.test(name)) throw new Error('タスク名は「苗字様」の形で入れてください');
-    if (!property) throw new Error('物件名を入れてください');
-    const store = HANKYO_ASANA.options.store[String(r['店舗'])];
-    if (!store) throw new Error('店舗（長崎店／県央支店）が分かりません');
-    const sv = CFG.selfViewing, cf = {};
-    cf[sv.type] = HANKYO_ASANA.options.type; cf[sv.source] = HANKYO_ASANA.options.source; cf[sv.result] = HANKYO_ASANA.options.result; cf[sv.store] = store;
-    cf[HANKYO_ASANA.property] = property; if (room) cf[HANKYO_ASANA.room] = room;
-    const notes = ['SUUMO反響（JDS連番 ' + r.id + '）', '反響日：' + r['受付日'], 'お名前：' + (r['顧客名'] || ''), 'メール：' + (r['メール'] || ''), 'TEL：' + (r['TEL'] || ''),
-      '問い合わせ内容：' + (r['問い合わせ内容'] || ''), 'リアプロBB現況：' + (r['現況'] || '未確認'), '', '空室業務ダッシュボードの「反響対応」から登録' + (CURRENT_USER ? '（' + CURRENT_USER.name + '）' : '')].join('\n');
-    // Asana APIは本文を {data: …} で包む（asanaPost_ はそのまま送るため）
-    const task = asanaPost_('/tasks', {data: {name: name, due_on: String(r['受付日']), notes: notes, custom_fields: cf, projects: [sv.project]}});
-    try { asanaPost_('/sections/' + HANKYO_ASANA.section + '/addTask', {data: {task: task.gid}}); } catch (e) { console.warn('セクションへの移動：' + e.message); } // 既存の反響タスクと同じセクションへ
-    sh.getRange(r.row, HANKYO_HEAD.indexOf('Asana') + 1).setValue(task.gid);
+    const task = hankyoAsanaCreate_(sh, r, hankyoClean_(body.name, 60).trim(), hankyoClean_(body.property, 120).trim(), hankyoClean_(body.room, 30).trim(),
+      '空室業務ダッシュボードの「反響対応」から登録' + (CURRENT_USER ? '（' + CURRENT_USER.name + '）' : ''));
+    const name = task.name;
     return {ok: true, already: false, gid: task.gid, name: name};
+  } finally { lock.releaseLock(); }
+}
+
+
+// Asanaにタスクを1件作り、反響の表の「Asana」列にgidを残す（画面の登録・取り込み時の自動登録で共通）
+function hankyoAsanaCreate_(sh, r, name, property, room, via) {
+  if (!/様/.test(name)) throw new Error('タスク名は「苗字様」の形で入れてください');
+  if (!property) throw new Error('物件名を入れてください');
+  const store = HANKYO_ASANA.options.store[String(r['店舗'])];
+  if (!store) throw new Error('店舗（長崎店／県央支店）が分かりません');
+  const sv = CFG.selfViewing, cf = {};
+  cf[sv.type] = HANKYO_ASANA.options.type; cf[sv.source] = HANKYO_ASANA.options.source; cf[sv.result] = HANKYO_ASANA.options.result; cf[sv.store] = store;
+  cf[HANKYO_ASANA.property] = property; if (room) cf[HANKYO_ASANA.room] = room;
+  const notes = ['SUUMO反響（JDS連番 ' + r.id + '）', '反響日：' + r['受付日'], 'お名前：' + (r['顧客名'] || ''), 'メール：' + (r['メール'] || ''), 'TEL：' + (r['TEL'] || ''),
+    '問い合わせ内容：' + (r['問い合わせ内容'] || ''), 'リアプロBB現況：' + (r['現況'] || '未確認'), '', via].join('\n');
+  // Asana APIは本文を {data: …} で包む（asanaPost_ はそのまま送るため）
+  const task = asanaPost_('/tasks', {data: {name: name, due_on: String(r['受付日']), notes: notes, custom_fields: cf, projects: [sv.project]}});
+  try { asanaPost_('/sections/' + HANKYO_ASANA.section + '/addTask', {data: {task: task.gid}}); } catch (e) { console.warn('セクションへの移動：' + e.message); } // 既存の反響タスクと同じセクションへ
+  sh.getRange(r.row, HANKYO_HEAD.indexOf('Asana') + 1).setValue(task.gid);
+  return {gid: task.gid, name: name, property: property, room: room};
+}
+
+// 物件名・号室をAsanaの書き方にそろえる：空室一覧【募集中】の「物件名＋号室」と一致すればその分け方を使う（例：Ｋ－５1 → K-5／1）
+function hankyoAsanaPlace_(r, vacancies) {
+  const n = v => String(v || '').normalize('NFKC').replace(/\s+/g, '').toLowerCase();
+  const key = n(String(r['物件名'] || '') + String(r['号室'] || ''));
+  const v = (vacancies || []).find(x => n(String(x.p || '') + String(x.r || '')) === key);
+  if (v) return {property: String(v.p).normalize('NFKC').trim(), room: String(v.r || '').normalize('NFKC').trim()};
+  if (r['号室']) return {property: String(r['物件名']).normalize('NFKC').trim(), room: String(r['号室']).normalize('NFKC').trim()};
+  return hankyoSplitRoom_(r['物件名']);
+}
+
+// JDSの反響を取り込んだ時点で、Asanaに無いものを自動で登録する（2026-11-01 オーナー指示）。
+// 同じ人のタスクがあれば作らない（受付日±3日、同じ物件なら±14日、苗字一致）。同じ苗字の別人が近くにいれば「苗字様(名前)」にする
+function hankyoAsanaAuto_(via) {
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    const sh = hankyoSheet_();
+    const rows = hankyoRows_(sh).filter(r => !r['Asana']);
+    const out = {registered: [], already: 0, failed: []};
+    if (!rows.length) return out;
+    const tasks = hankyoAsanaTasks_(rows.map(r => String(r['受付日'])).sort()[0]);
+    let vacancies = [];
+    try { vacancies = getSnapshot_(false).vacancies || []; } catch (e) { console.warn('空室一覧を読めません：' + e.message); }
+    const done = {};
+    rows.sort((a, b) => String(a['受付日']).localeCompare(String(b['受付日']))).slice(0, 25).forEach(r => {
+      if (done[r.id]) return;
+      try {
+        const found = hankyoAsanaFind_(r, tasks);
+        if (found) { sh.getRange(r.row, HANKYO_HEAD.indexOf('Asana') + 1).setValue(found.gid); out.already++; return; }
+        const full = hankyoNameKey_(r['顧客名']), sur = hankyoSurname_(r['顧客名']);
+        if (!sur) throw new Error('お名前がありません');
+        const given = full.indexOf(' ') > 0 ? full.split(' ').slice(1).join('') : '';
+        const sameSurname = tasks.some(t => String(t.name || '').normalize('NFKC').replace(/\s+/g, '').replace(/様.*$/, '') === sur.replace(/\s/g, ''));
+        const name = sur.replace(/\s/g, '') + '様' + (sameSurname && given ? '(' + given + ')' : '');
+        const pl = hankyoAsanaPlace_(r, vacancies);
+        // 同じ人が同じ日に同じ物件の複数の部屋へ問い合わせたら1タスクにまとめ、号室は「105・205」（仕様書どおり）
+        const same = rows.filter(x => x.id !== r.id && !done[x.id] && hankyoNameKey_(x['顧客名']) === full && String(x['受付日']) === String(r['受付日'])
+          && hankyoAsanaPlace_(x, vacancies).property === pl.property);
+        const rooms = [pl.room].concat(same.map(x => hankyoAsanaPlace_(x, vacancies).room)).filter((v, i, a) => v && a.indexOf(v) === i);
+        const t = hankyoAsanaCreate_(sh, r, name, pl.property, rooms.join('・'), via);
+        same.forEach(x => { sh.getRange(x.row, HANKYO_HEAD.indexOf('Asana') + 1).setValue(t.gid); done[x.id] = true; });
+        // 同じ取り込みの中で同じ人が続いても二重に作らない
+        tasks.push({gid: t.gid, name: name, due_on: String(r['受付日']), custom_fields: [{gid: CFG.selfViewing.source, display_value: 'SUUMO'}, {gid: HANKYO_ASANA.property, display_value: pl.property}]});
+        r['Asana'] = t.gid;
+        out.registered.push({id: r.id, name: name, property: pl.property, room: rooms.join('・')});
+      } catch (e) { out.failed.push({id: r.id, error: String(e.message || e)}); }
+    });
+    if (out.failed.length) notifyAdmin_('反響のAsana自動登録で登録できないものがありました', out.failed.map(f => f.id + '：' + f.error).join('\n'), 'hankyo_asana');
+    return out;
   } finally { lock.releaseLock(); }
 }
 

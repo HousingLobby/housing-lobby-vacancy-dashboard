@@ -136,7 +136,10 @@
       say(`JDSから${msg.items.length}件を読み取りました。登録しています…`);
       const r = await Api.hankyoImport({items: msg.items, store: msg.store});
       const store = {A: '県央店（諫早）', B: '長崎店'}[msg.store] || '';
-      say(`${store}：JDSの${msg.items.length}件のうち、新規${r.added}件を取り込みました（残り${Math.max(0, msg.items.length - r.added)}件は、すでに登録済みか、読み取れなかったためそのままです）。`);
+      const a = r.asana || {};
+      const asanaText = a.error ? `Asanaへの自動登録はできませんでした（${a.error}）。一覧の「Asana」欄から登録してください。`
+        : `Asana：新しく${(a.registered || []).length}件を登録${a.already ? `（${a.already}件はすでにありました）` : ''}${(a.failed || []).length ? `。${a.failed.length}件は登録できなかったため、一覧の「Asana」欄から登録してください` : ''}。`;
+      say(`${store}：JDSの${msg.items.length}件のうち、新規${r.added}件を取り込みました（残り${Math.max(0, msg.items.length - r.added)}件は、すでに登録済みか、読み取れなかったためそのままです）。${asanaText}`);
       $('import-done').hidden = false; list = null;
     } catch (e) { say('取り込めませんでした：' + e.message, true); }
     importing = false;

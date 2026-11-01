@@ -14,7 +14,7 @@
   <script defer src="api.js?v=20261101h"></script>
   <script defer src="nav.js?v=20261022"></script>
   <script defer src="monthend.js?v=20261022n"></script>
-  <script defer src="hankyo.js?v=20261101h"></script>
+  <script defer src="hankyo.js?v=20261101j"></script>
 </head>
 <body data-page="hankyo">
   <header class="masthead"><div class="masthead-inner"><div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div><div class="asof" id="asof"></div></div></header>
@@ -50,7 +50,7 @@
         <p style="margin:0 0 8px;font-size:.9rem">① 下のボタンを、ブラウザの<b>ブックマークバーにドラッグ</b>して登録します（最初の1回だけ）。<br>② <b>JDSにログイン</b>した状態で、JDSのページを開いたまま、そのブックマークを押します。<br>③ 新しいタブが開き、新しい反響だけがダッシュボードに登録されます（数秒）。</p>
         <a class="primary-button" id="bookmarklet" style="display:inline-block;text-decoration:none" href="javascript:(function(){var s=document.createElement('script');s.src='https://housinglobby.github.io/housing-lobby-vacancy-dashboard/jds-import.js?t='+Date.now();document.body.appendChild(s)})();">JDS反響を取り込む</a>
         <span class="footnote" style="margin-left:8px">← ドラッグして登録（ここでは押さないでください）</span>
-        <p class="footnote" style="margin:8px 0 0">ログインしている店舗（長崎店／県央店）の反響だけが対象です。メールの送信・JDSへの書き込みはしません。Asanaへの登録は、取り込んだあと一覧の「Asana」欄で確認し、お客様ごとのページから行います。</p>
+        <p class="footnote" style="margin:8px 0 0">ログインしている店舗（長崎店／県央店）の反響だけが対象です。取り込むと、Asana「セルフ内見予約表」に無い反響は<b>自動で登録</b>します（同じ人のタスクがあれば作りません）。メールの送信・JDSへの書き込みはしません。</p>
       </div>
       <div class="panel">
         <div class="panel-heading"><h2>お客様一覧</h2><span id="list-count"></span></div>
