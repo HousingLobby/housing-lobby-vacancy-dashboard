@@ -3,7 +3,7 @@
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const STORE = {A: '諫早店', B: '長崎店'};
-  let list = null, current = null, ME = null;
+  let list = null, current = null, ME = null, asana = null; // asana：{id: {registered, gid, name, suggest}}（Asanaへの登録状況）
 
   const showError = msg => { const e = $('error'); e.textContent = msg; e.hidden = !msg; };
   const copyText = async (text, btn) => {
@@ -24,10 +24,47 @@
 
   function renderList() {
     const st = $('state-filter').value, q = $('search').value.trim().toLowerCase();
-    const rows = list.items.filter(r => (st === 'all' || r.state === st) && (!q || `${r.name} ${r.property} ${r.room}`.toLowerCase().includes(q)));
+    const rows = list.items.filter(r => (st === 'all' || r.state === st || (st === 'asana-missing' && asana && asana[r.id] && !asana[r.id].registered)) && (!q || `${r.name} ${r.property} ${r.room}`.toLowerCase().includes(q)));
     $('list-count').textContent = `${rows.length}件（保存中 ${list.items.length}件）`;
-    $('list-body').innerHTML = rows.length ? rows.map(r => `<tr class="hk-row"><td>${esc(r.date)}</td><td><a href="#${encodeURIComponent(r.id)}">${esc(r.name || '（名前なし）')}</a></td><td>${esc(r.property)} ${esc(r.room)}</td><td>${esc(STORE[r.store] || r.store)}</td><td>${r.hasReply ? '<span class="badge good">あり</span>' : '<span class="badge muted">なし</span>'}</td><td><span class="badge ${r.state === '返信済' ? 'good' : 'warn'}">${esc(r.state)}</span></td></tr>`).join('') : '<tr><td colspan="6" class="empty">該当する反響はありません</td></tr>';
+    $('list-body').innerHTML = rows.length ? rows.map(r => `<tr class="hk-row"><td>${esc(r.date)}</td><td><a href="#${encodeURIComponent(r.id)}">${esc(r.name || '（名前なし）')}</a></td><td>${esc(r.property)} ${esc(r.room)}</td><td>${esc(STORE[r.store] || r.store)}</td><td>${r.hasReply ? '<span class="badge good">あり</span>' : '<span class="badge muted">なし</span>'}</td><td><span class="badge ${r.state === '返信済' ? 'good' : 'warn'}">${esc(r.state)}</span></td><td>${asanaBadge(r.id)}</td></tr>`).join('') : '<tr><td colspan="7" class="empty">該当する反響はありません</td></tr>';
     document.querySelectorAll('.hk-row').forEach(tr => tr.addEventListener('click', e => { if (e.target.tagName !== 'A') location.hash = tr.querySelector('a').getAttribute('href'); }));
+  }
+
+  // ---- Asana（セルフ内見予約表）への登録状況と登録（2026-11-01）
+  const asanaUrl = gid => `https://app.asana.com/0/1201888167643147/${encodeURIComponent(gid)}`;
+  function asanaBadge(id) {
+    if (!asana) return '<span class="badge muted">確認中</span>';
+    const a = asana[id];
+    if (!a) return '<span class="badge muted">—</span>';
+    return a.registered ? `<a class="badge good" href="${asanaUrl(a.gid)}" target="_blank" rel="noopener noreferrer">登録済み ↗</a>` : '<span class="badge warn">未登録</span>';
+  }
+  async function loadAsana() {
+    try { asana = (await Api.hankyoAsanaCheck()).items || {}; } catch (e) { asana = {}; showError('Asanaの登録状況を確認できませんでした：' + e.message); }
+    if (list) renderList();
+    if (current) renderAsana(current);
+  }
+  function renderAsana(d) {
+    const box = $('d-asana-body'), a = asana && asana[d.id];
+    if (!asana) { $('d-asana-state').textContent = ''; box.innerHTML = '<p class="footnote" style="margin:0">確認しています…</p>'; return; }
+    if (!a) { box.innerHTML = '<p class="footnote" style="margin:0">この反響は確認できませんでした。一覧を開き直してください。</p>'; return; }
+    if (a.registered) { $('d-asana-state').innerHTML = '<span class="badge good">登録済み</span>'; box.innerHTML = `<p style="margin:0">タスク：<a href="${asanaUrl(a.gid)}" target="_blank" rel="noopener noreferrer">${esc(a.name)} ↗</a></p>`; return; }
+    const g = a.suggest || {};
+    $('d-asana-state').innerHTML = '<span class="badge warn">未登録</span>';
+    box.innerHTML = `<p class="footnote" style="margin:0 0 10px">受付日の前後3日に、同じ苗字のSUUMO反響タスクが見つかりません。物件名はAsanaの既存の表記に合わせて直してから登録してください。</p>
+      <div class="filters"><label>タスク名<input id="as-name" value="${esc(g.name || '')}" placeholder="苗字様（同姓がいれば 苗字様(名前)）"></label><label class="search-field">物件名<input id="as-property" value="${esc(g.property || '')}"></label><label>号室<input id="as-room" value="${esc(g.room || '')}" placeholder="105（複数は 105・205）"></label></div>
+      <p class="footnote" style="margin:0 0 10px">同時に入る値：種別＝反響／反響経由＝SUUMO／内見結果＝問い合わせのみ／担当店舗＝${g.store === 'A' ? '県央支店' : g.store === 'B' ? '長崎店' : '不明'}／期日＝${esc(g.due || '')}（受付日）。説明欄に連絡先・問い合わせ内容・現況が入ります。</p>
+      <button type="button" class="primary-button" id="as-go">Asanaに登録</button><p class="save-message" id="as-msg" role="status"></p>`;
+    $('as-go').addEventListener('click', async () => {
+      const body = {id: d.id, name: $('as-name').value.trim(), property: $('as-property').value.trim(), room: $('as-room').value.trim()};
+      if (!confirm(`Asana「セルフ内見予約表」に次のタスクを作ります。\n\nタスク名：${body.name}\n物件名：${body.property}\n号室：${body.room || '（なし）'}\n期日：${g.due}\n\nよろしいですか？`)) return;
+      $('as-go').disabled = true; $('as-msg').textContent = '登録しています…';
+      try {
+        const r = await Api.hankyoAsanaRegister(body);
+        asana[d.id] = {registered: true, gid: r.gid, name: r.name};
+        renderAsana(d); if (list) renderList();
+        $('d-top-message').textContent = r.already ? `すでにAsanaにありました（${r.name}）。新しくは作っていません。` : `Asanaに登録しました（${r.name}）。`;
+      } catch (e) { $('as-go').disabled = false; $('as-msg').textContent = '登録できませんでした：' + e.message; }
+    });
   }
 
   // 反響データ確認（JDSからの取り込み依頼）
@@ -57,6 +94,7 @@
       list = await Api.hankyoList();
       $('keep-note').textContent = `お客様の情報は受付日から${list.keepDays}日保存`;
       renderCounts(); renderList(); renderCheck(list.check); renderLast(list.lastChecked || {}); showError(''); if (ME) ME.refresh();
+      loadAsana(); // Asanaの登録状況は少し時間がかかるので、一覧を出してから後で埋める
     } catch (e) { showError('反響の一覧を取得できませんでした：' + e.message); }
   }
 
@@ -74,6 +112,7 @@
     $('d-msg').textContent = d.message || '（内容の記録なし）';
     $('d-reply').value = d.reply || '';
     $('d-message').textContent = '';
+    renderAsana(d);
     fillTplForm(d); clearTimeout(lpTimer); lpFor = null; $('tpl-lp-state').textContent = '';
     $('d-expire').textContent = `この記録は ${d.expire} に自動削除されます（受付日から${list ? list.keepDays : 40}日）。`;
   }
