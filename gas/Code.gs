@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-11-01-hankyo-auto';
+const APP_VERSION = '2026-11-01-hankyo-auto2';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -1873,10 +1873,13 @@ function hankyoAsanaCreate_(sh, r, name, property, room, via) {
   cf[HANKYO_ASANA.property] = property; if (room) cf[HANKYO_ASANA.room] = room;
   const notes = ['SUUMO反響（JDS連番 ' + r.id + '）', '反響日：' + r['受付日'], 'お名前：' + (r['顧客名'] || ''), 'メール：' + (r['メール'] || ''), 'TEL：' + (r['TEL'] || ''),
     '問い合わせ内容：' + (r['問い合わせ内容'] || ''), 'リアプロBB現況：' + (r['現況'] || '未確認'), '', via].join('\n');
+  // 3段階で作る（どこで失敗したか分かるように）：①ワークスペースにタスクを作る ②セルフ内見予約表（無題のセクション）に入れる ③項目を設定
   // Asana APIは本文を {data: …} で包む（asanaPost_ はそのまま送るため）
-  const task = asanaPost_('/tasks', {data: {name: name, due_on: String(r['受付日']), notes: notes, custom_fields: cf, projects: [sv.project]}});
-  try { asanaPost_('/sections/' + HANKYO_ASANA.section + '/addTask', {data: {task: task.gid}}); } catch (e) { console.warn('セクションへの移動：' + e.message); } // 既存の反響タスクと同じセクションへ
-  sh.getRange(r.row, HANKYO_HEAD.indexOf('Asana') + 1).setValue(task.gid);
+  const step = (label, fn) => { try { return fn(); } catch (e) { throw new Error('Asana登録（' + label + '）：' + e.message); } };
+  const task = step('作成', () => asanaPost_('/tasks', {data: {workspace: String(CFG.workspace), name: name, due_on: String(r['受付日']), notes: notes}}));
+  sh.getRange(r.row, HANKYO_HEAD.indexOf('Asana') + 1).setValue(task.gid); // 途中で失敗しても二重に作らないよう、先に記録する
+  step('プロジェクトに追加', () => asanaPost_('/tasks/' + task.gid + '/addProject', {data: {project: String(sv.project), section: HANKYO_ASANA.section}}));
+  step('項目の設定', () => asanaFetch_('put', '/tasks/' + task.gid, null, {data: {custom_fields: cf}}));
   return {gid: task.gid, name: name, property: property, room: room};
 }
 
