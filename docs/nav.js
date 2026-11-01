@@ -2,7 +2,7 @@
   'use strict';
   // ページの切り替えをプルダウン（メニュー）にまとめる。トップ（index.html）は既存のタブをメニューの中へ移し、
   // 月例巡回・反響対応などのページには同じメニューを上に追加する
-  const PAGES = [['overview', '全体'], ['occupancy', '入居率・空室'], ['restoration', '原状回復完了'], ['patrol', '巡回'], ['promotion', '入居促進'], ['junkai', '月例巡回'], ['hankyo', '反響対応']];
+  const PAGES = [['overview', '全体・入居率・空室'], ['restoration', '原状回復完了'], ['patrol', '巡回'], ['promotion', '入居促進'], ['junkai', '月例巡回'], ['hankyo', '反響対応']];
   const hrefOf = k => k === 'junkai' ? 'junkai.html' : k === 'hankyo' ? 'hankyo.html' : `index.html#${k}`;
   const labelOf = k => (PAGES.find(p => p[0] === k) || PAGES[0])[1];
   function build() {
@@ -17,7 +17,7 @@
       // トップ：既存のタブ（ボタン）をメニューに入れ、別ページへのリンクはそのまま残す
       nav.parentNode.insertBefore(menu, nav);
       menu.appendChild(nav);
-      const update = () => { const k = location.hash.slice(1) || 'overview'; document.getElementById('nav-current').textContent = labelOf(PAGES.some(p => p[0] === k) ? k : 'overview'); };
+      const update = () => { const k = (location.hash.slice(1) || 'overview').replace(/^occupancy$/, 'overview'); document.getElementById('nav-current').textContent = labelOf(PAGES.some(p => p[0] === k) ? k : 'overview'); };
       nav.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { menu.open = false; setTimeout(update, 0); }));
       window.addEventListener('hashchange', update);
       update();

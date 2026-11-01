@@ -7,17 +7,17 @@
   <meta name="description" content="空室・入居率・原状回復・巡回を確認する社内向け試作画面">
   <title>空室業務ダッシュボード</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%23102841'/%3E%3Cpath d='M12 31 32 14l20 17v21H12z' fill='none' stroke='%23f4bb61' stroke-width='5' stroke-linejoin='round'/%3E%3Cpath d='M26 52V36h12v16' fill='none' stroke='%23f4bb61' stroke-width='5'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=20261026">
+  <link rel="stylesheet" href="styles.css?v=20261101">
   <script defer src="vendor/msal-browser-2.38.3.min.js"></script>
   <script defer src="config.js?v=20261008gas2"></script>
   <script defer src="auth.js?v=20261011e"></script>
   <script defer src="snapshot-current.js?v=20261008auth"></script>
   <script defer src="patrol-store.js?v=20261002"></script>
   <script defer src="api.js?v=20261029s"></script>
-  <script defer src="nav.js?v=20261022"></script>
+  <script defer src="nav.js?v=20261101"></script>
   <script defer src="outbox.js?v=20261008auth"></script>
   <script defer src="outbox-bar.js?v=20261008auth"></script>
-  <script defer src="app.js?v=20261029b"></script>
+  <script defer src="app.js?v=20261101"></script>
   <script defer src="monthend.js?v=20261022n"></script>
   <script defer src="promotion.js?v=20261022n"></script>
   <script defer src="suumo.js?v=20261030"></script>
@@ -33,9 +33,8 @@
   <div class="outbox-bar" id="outbox-bar" hidden></div>
   <main class="shell">
     <nav class="tabs" aria-label="画面切替">
-      <button class="tab active" type="button" data-view="overview" aria-current="page">全体</button>
-      <button class="tab" type="button" data-view="occupancy">入居率・空室</button>
-      <button class="tab" type="button" data-view="restoration">原状回復完了</button>
+      <button class="tab active" type="button" data-view="overview" aria-current="page">全体・入居率・空室</button>
+            <button class="tab" type="button" data-view="restoration">原状回復完了</button>
       <button class="tab" type="button" data-view="patrol">巡回</button>
       <button class="tab" type="button" data-view="promotion">入居促進</button>
       <a class="tab tab-link" href="junkai.html">月例巡回</a>
@@ -50,14 +49,15 @@
         <section class="panel"><div class="panel-heading"><h2>エリア別 入居率</h2><span>管理戸数は最新の全体会議資料</span></div><div id="area-bars"></div></section>
         <section class="panel"><div class="panel-heading"><h2>確認が必要なデータ</h2><span>集計対象の【募集中】</span></div><div id="exceptions"></div></section>
       </div>
-      <section class="panel"><div class="panel-heading"><h2>集計の内訳</h2><span>管理戸数は非公開・率のみ表示</span></div><div class="table-scroll"><table id="summary-table"><thead><tr><th>エリア・種別</th><th>①原復済</th><th>②原復未</th><th>③退去予定</th><th>④募集止め</th><th>⑤14日免除</th><th>入居率</th><th>評価入居率</th></tr></thead><tbody></tbody></table></div></section>
-    </section>
 
-    <section class="view" id="view-occupancy" aria-labelledby="occupancy-title" hidden>
-      <div class="section-heading"><div><p class="eyebrow">OCCUPANCY</p><h1 id="occupancy-title">入居率・空室一覧</h1></div><p class="section-meta">空室一覧「募集中」セクションの未完了タスク</p></div>
-      <div class="filters"><label>エリア<select id="area-filter"><option value="all">全エリア</option><option>長崎中央</option><option>長崎北</option><option>諫早</option><option>大村</option></select></label><label>状態<select id="status-filter"><option value="all">すべて</option><option value="①">① 原復済</option><option value="②">② 原復未</option><option value="③">③ 退去予定</option><option value="④">④ 募集止め</option><option value="other">要確認</option></select></label><label class="search-field">物件名・号室<input id="search" type="search" placeholder="物件名や号室で検索"></label></div>
-      <div class="panel"><div class="panel-heading"><h2>物件一覧</h2><span id="listing-count"></span></div><div class="table-scroll"><table class="list-table"><thead><tr><th>物件・号室</th><th>エリア</th><th>管理種別</th><th>区分</th><th>空室状況</th><th>Asana</th></tr></thead><tbody id="listing-body"></tbody></table></div></div>
-      <section class="panel" id="management-panel"><div class="panel-heading"><h2>管理戸数の登録（月ごと）</h2><span>入居率の分母。全体会議資料「2.エリア別」の値</span></div>
+      <section class="panel" id="breakdown"><div class="panel-heading"><h2>詳細な内訳</h2><span>件数を押すと、下の物件一覧をその条件で絞り込みます</span></div>
+        <div class="subtabs" role="tablist" aria-label="内訳の切り替え">
+          <button type="button" role="tab" data-bd="area" class="on" aria-selected="true">エリア・種別</button><button type="button" role="tab" data-bd="status" aria-selected="false">空室状況</button><button type="button" role="tab" data-bd="kind" aria-selected="false">管理種別</button><button type="button" role="tab" data-bd="mgmt" id="bd-mgmt-tab" aria-selected="false">管理戸数の登録</button>
+        </div>
+        <div data-bd-panel="area"><p class="footnote" style="margin:0 0 8px">管理戸数は非公開・率のみ表示。対象は4エリアのサブ・一般（一般管理・セキスイ）。</p><div class="table-scroll"><table id="summary-table"><thead><tr><th>エリア・種別</th><th class="num">①原復済</th><th class="num">②原復未</th><th class="num">③退去予定</th><th class="num">④募集止め</th><th class="num">⑤14日免除</th><th class="num">入居率</th><th class="num">評価入居率</th></tr></thead><tbody></tbody></table></div></div>
+        <div data-bd-panel="status" hidden><p class="footnote" style="margin:0 0 8px">Asana「空室状況」ごとの件数（【募集中】の全タスク）。</p><div class="table-scroll"><table id="status-table"></table></div></div>
+        <div data-bd-panel="kind" hidden><p class="footnote" style="margin:0 0 8px">管理種別ごとの件数（【募集中】の全タスク）。入居率の対象はサブ・一般管理・セキスイ物件です。</p><div class="table-scroll"><table id="kind-table"></table></div></div>
+        <div data-bd-panel="mgmt" id="management-panel" hidden><p class="footnote" style="margin:0 0 8px">入居率の分母。全体会議資料「2.エリア別」の値（月ごと）。</p>
         <form id="management-form" class="mgmt-form">
           <p class="location-help" id="management-base"></p>
           <div class="filters"><label>対象月<input name="month" type="month" required></label><label class="search-field">出典<input name="source" type="text" maxlength="120" placeholder="例：2026年10月度（9月実績）全体会議資料"></label></div>
@@ -65,8 +65,13 @@
           <div class="filters"><label>管理用の合言葉<input name="passcode" type="password" required autocomplete="off"></label></div>
           <button type="submit" class="primary-button">管理戸数を登録</button><p id="management-message" role="status" class="save-message"></p>
         </form>
+        </div>
       </section>
-      <p class="footnote">集計対象は4エリアの一般管理・セキスイ物件・サブ。地区や管理種別が対象外のタスクは入居率に加えていません。</p>
+
+      <section class="panel" id="listing-panel"><div class="panel-heading"><h2>物件一覧</h2><span id="listing-count"></span></div>
+        <div class="filters"><label>エリア<select id="area-filter"><option value="all">全エリア</option><option>長崎中央</option><option>長崎北</option><option>諫早</option><option>大村</option><option value="other">その他（4エリア以外）</option></select></label><label>区分<select id="status-filter"><option value="all">すべて</option><option value="①">① 原復済</option><option value="②">② 原復未</option><option value="③">③ 退去予定</option><option value="④">④ 募集止め</option><option value="other">要確認</option></select></label><label>空室状況<select id="cond-filter"><option value="all">すべて</option></select></label><label>管理種別<select id="kind-filter"><option value="all">すべて</option></select></label><label class="search-field">物件名・号室<input id="search" type="search" placeholder="物件名や号室で検索"></label><label>&nbsp;<button type="button" class="secondary-button" id="filter-clear">絞り込みを解除</button></label></div>
+        <div class="table-scroll"><table class="list-table"><thead><tr><th>物件・号室</th><th>エリア</th><th>管理種別</th><th>区分</th><th>空室状況</th><th>Asana</th></tr></thead><tbody id="listing-body"></tbody></table></div></section>
+      <p class="footnote">空室一覧「募集中」セクションの未完了タスク。集計対象は4エリアの一般管理・セキスイ物件・サブ。地区や管理種別が対象外のタスクは入居率に加えていません。</p>
     </section>
 
     <section class="view" id="view-restoration" aria-labelledby="restoration-title" hidden>
