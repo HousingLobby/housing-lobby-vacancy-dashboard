@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-11-01-hankyo-asana2';
+const APP_VERSION = '2026-11-01-hankyo-asana3';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -1860,8 +1860,9 @@ function hankyoAsanaRegister_(body) {
     cf[HANKYO_ASANA.property] = property; if (room) cf[HANKYO_ASANA.room] = room;
     const notes = ['SUUMO反響（JDS連番 ' + r.id + '）', '反響日：' + r['受付日'], 'お名前：' + (r['顧客名'] || ''), 'メール：' + (r['メール'] || ''), 'TEL：' + (r['TEL'] || ''),
       '問い合わせ内容：' + (r['問い合わせ内容'] || ''), 'リアプロBB現況：' + (r['現況'] || '未確認'), '', '空室業務ダッシュボードの「反響対応」から登録' + (CURRENT_USER ? '（' + CURRENT_USER.name + '）' : '')].join('\n');
-    const task = asanaPost_('/tasks', {name: name, due_on: String(r['受付日']), notes: notes, custom_fields: cf, projects: [sv.project]});
-    try { asanaPost_('/sections/' + HANKYO_ASANA.section + '/addTask', {task: task.gid}); } catch (e) { console.warn('セクションへの移動：' + e.message); } // 既存の反響タスクと同じセクションへ
+    // Asana APIは本文を {data: …} で包む（asanaPost_ はそのまま送るため）
+    const task = asanaPost_('/tasks', {data: {name: name, due_on: String(r['受付日']), notes: notes, custom_fields: cf, projects: [sv.project]}});
+    try { asanaPost_('/sections/' + HANKYO_ASANA.section + '/addTask', {data: {task: task.gid}}); } catch (e) { console.warn('セクションへの移動：' + e.message); } // 既存の反響タスクと同じセクションへ
     sh.getRange(r.row, HANKYO_HEAD.indexOf('Asana') + 1).setValue(task.gid);
     return {ok: true, already: false, gid: task.gid, name: name};
   } finally { lock.releaseLock(); }
