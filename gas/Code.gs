@@ -1,5 +1,5 @@
 /**
- * 空室業務ダッシュボード API（Google Apps Script）
+ * リーシング業務ダッシュボード API（Google Apps Script）
  *
  * - 画面（GitHub Pages）からの読み取り・巡回登録を受け、Asanaへ中継する。
  * - Asanaトークンはスクリプトプロパティ ASANA_TOKEN にのみ保存する。画面側には渡さない。
@@ -456,7 +456,7 @@ function parsePatrol_(story) {
   let note = '';
   if (noteIndex >= 0) {
     const rest = [lines[noteIndex].slice(3)].concat(lines.slice(noteIndex + 1));
-    note = rest.filter(l => !/^（空室業務ダッシュボードから登録/.test(l)).join('\n').trim();
+    note = rest.filter(l => !/^（(空室|リーシング)業務ダッシュボードから登録/.test(l)).join('\n').trim(); // 2026-11-02 名称変更前の記録も読む
   }
   return {
     date: head[1],
@@ -527,7 +527,7 @@ function patrolText_(r) {
   lines.push('担当：' + r.inspector);
   if (CURRENT_USER) lines.push('登録者：' + CURRENT_USER.name + '（' + CURRENT_USER.email + '）');
   if (r.note) lines.push('メモ：' + r.note);
-  lines.push('（空室業務ダッシュボードから登録・ID:' + r.clientId + '）');
+  lines.push('（リーシング業務ダッシュボードから登録・ID:' + r.clientId + '）');
   return lines.join('\n');
 }
 
@@ -1322,7 +1322,7 @@ function writeHpManagement_(token, year, month, total) {
 /** 毎朝：管理戸数の自動取得（入居率週報の日次自動入力（17時台）と重ならない時刻に動かす） */
 function managementJob() {
   if (!PropertiesService.getScriptProperties().getProperty('MS_CLIENT_ID')) return;
-  try { importManagementFromMeetingDoc(); } catch (e) { notifyAdmin_('空室業務ダッシュボード：管理戸数の自動取得', String(e.message || e), 'mgmt_error'); }
+  try { importManagementFromMeetingDoc(); } catch (e) { notifyAdmin_('リーシング業務ダッシュボード：管理戸数の自動取得', String(e.message || e), 'mgmt_error'); }
 }
 
 /** 手動で1回実行：自動処理を登録する（15分ごとのデータ更新、毎日17:30の点検、毎朝9時の管理戸数の自動取得） */
@@ -1345,7 +1345,7 @@ function refreshJob() {
     const pr = PropertiesService.getScriptProperties();
     const fails = Number(pr.getProperty('STATUS_FAILS') || 0) + 1;
     pr.setProperty('STATUS_FAILS', String(fails));
-    if (fails === 4) notifyAdmin_('空室業務ダッシュボード：Asanaからデータを取得できません', '1時間以上、取得に失敗しています。画面は最後に取得したデータで表示を続けています。\n\n' + e.message, 'refresh');
+    if (fails === 4) notifyAdmin_('リーシング業務ダッシュボード：Asanaからデータを取得できません', '1時間以上、取得に失敗しています。画面は最後に取得したデータで表示を続けています。\n\n' + e.message, 'refresh');
     return;
   }
   PropertiesService.getScriptProperties().setProperty('STATUS_FAILS', '0');
@@ -1388,7 +1388,7 @@ function dailyJob() {
   const expected = (() => { const [y, m] = todayJst_().split('-').map(Number); return new Date(Date.UTC(y, m - 3, 1)).toISOString().slice(0, 7); })();
   if (!latest || latest < expected) errors.push('管理戸数が古いままです（最新：' + (latest || 'なし') + '）');
   try { hankyoPurge_(); } catch (e) { errors.push('反響の期限切れ削除：' + e.message); }
-  if (errors.length) notifyAdmin_('空室業務ダッシュボード：要確認', errors.join('\n'));
+  if (errors.length) notifyAdmin_('リーシング業務ダッシュボード：要確認', errors.join('\n'));
 }
 
 function notifyAdmin_(subject, body, throttleKey) {
@@ -1400,7 +1400,7 @@ function notifyAdmin_(subject, body, throttleKey) {
     if (last && Date.now() - new Date(last).getTime() < 6 * 3600 * 1000) return;
     pr.setProperty(k, new Date().toISOString());
   }
-  try { MailApp.sendEmail(to, subject, body + '\n\n（空室業務ダッシュボード GAS から自動送信）'); } catch (e) { Logger.log('通知を送れませんでした：' + e.message); }
+  try { MailApp.sendEmail(to, subject, body + '\n\n（リーシング業務ダッシュボード GAS から自動送信）'); } catch (e) { Logger.log('通知を送れませんでした：' + e.message); }
 }
 
 /* ---------- 報告書用：巡回で登録した写真 ---------- */
@@ -1496,7 +1496,7 @@ function asanaFetch_(method, path, params, payload) {
     if (code >= 300) {
       const e = new Error('Asana ' + code + ': ' + ((body.errors && body.errors[0] && body.errors[0].message) || ''));
       e.retryable = code === 401 || code === 403 ? false : code >= 500;
-      if (code === 401) notifyAdmin_('空室業務ダッシュボード：Asanaトークンが無効です', 'ASANA_TOKEN を発行し直して差し替えてください。', 'token');
+      if (code === 401) notifyAdmin_('リーシング業務ダッシュボード：Asanaトークンが無効です', 'ASANA_TOKEN を発行し直して差し替えてください。', 'token');
       throw e;
     }
     return body;
@@ -1911,7 +1911,7 @@ function hankyoImport_(body) {
   const r = hankyoUpsertCore_(ok, true);
   if (store) { const l = hankyoLastGet__(); l[store] = new Date().toISOString(); PropertiesService.getScriptProperties().setProperty('HANKYO_LAST', JSON.stringify(l)); }
   let asana;
-  try { asana = hankyoAsanaAuto_('空室業務ダッシュボードのJDS取り込みで自動登録' + (CURRENT_USER ? '（' + CURRENT_USER.name + '）' : '')); } catch (e) { asana = {error: String(e.message || e)}; }
+  try { asana = hankyoAsanaAuto_('リーシング業務ダッシュボードのJDS取り込みで自動登録' + (CURRENT_USER ? '（' + CURRENT_USER.name + '）' : '')); } catch (e) { asana = {error: String(e.message || e)}; }
   return {ok: true, added: r.added, replied: r.updated, skipped: items.length - ok.length + (ok.length - r.added - r.updated), read: items.length, asana: asana};
 }
 
@@ -2108,7 +2108,7 @@ function hankyoAsanaRegister_(body) {
       return {ok: true, already: true, gid: found.gid, name: found.name};
     }
     const task = hankyoAsanaCreate_(sh, r, hankyoClean_(body.name, 60).trim(), hankyoClean_(body.property, 120).trim(), hankyoClean_(body.room, 30).trim(),
-      '空室業務ダッシュボードの「反響対応」から登録' + (CURRENT_USER ? '（' + CURRENT_USER.name + '）' : ''));
+      'リーシング業務ダッシュボードの「反響対応」から登録' + (CURRENT_USER ? '（' + CURRENT_USER.name + '）' : ''));
     const name = task.name;
     return {ok: true, already: false, gid: task.gid, name: name};
   } finally { lock.releaseLock(); }

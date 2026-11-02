@@ -73,6 +73,8 @@
     patrols: task => request({action: 'patrols', task}),
     status: () => request({action: 'status'}),
     promotionGoals: month => request({action: 'promotionGoals', month}),
+    annualPromotionGoals: year => request({action: 'annualPromotionGoals', year}),
+    setAnnualPromotionGoals: body => request(null, {action: 'setAnnualPromotionGoals', ...body}),
     meetingDraft: month => request({action: 'meetingDraft', month}),
     meetingData: month => request({action: 'meetingData', month}, null, 240000),
     saveMeeting: body => request(null, {action: 'saveMeeting', ...body}, 240000),

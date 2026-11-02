@@ -5,33 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#102841">
   <meta name="description" content="空室・入居率・原状回復・巡回を確認する社内向け試作画面">
-  <title>空室業務ダッシュボード</title>
+  <title>リーシング業務ダッシュボード</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%23102841'/%3E%3Cpath d='M12 31 32 14l20 17v21H12z' fill='none' stroke='%23f4bb61' stroke-width='5' stroke-linejoin='round'/%3E%3Cpath d='M26 52V36h12v16' fill='none' stroke='%23f4bb61' stroke-width='5'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css?v=20261102goals">
-  <link rel="stylesheet" href="promotion-goals.css?v=20261102">
+  <link rel="stylesheet" href="promotion-goals.css?v=20261102annual">
   <link rel="stylesheet" href="meeting.css?v=20261102">
   <script defer src="vendor/msal-browser-2.38.3.min.js"></script>
   <script defer src="config.js?v=20261008gas2"></script>
   <script defer src="auth.js?v=20261011e"></script>
   <script defer src="snapshot-current.js?v=20261008auth"></script>
   <script defer src="patrol-store.js?v=20261002"></script>
-  <script defer src="api.js?v=20261102goals"></script>
+  <script defer src="api.js?v=20261102annual"></script>
   <script defer src="nav.js?v=20261101"></script>
   <script defer src="outbox.js?v=20261008auth"></script>
   <script defer src="outbox-bar.js?v=20261008auth"></script>
   <script defer src="app.js?v=20261101b"></script>
   <script defer src="monthend.js?v=20261101m"></script>
-  <script defer src="promotion-goals.js?v=20261102"></script>
-  <script defer src="promotion.js?v=20261102goals"></script>
+  <script defer src="promotion-goals.js?v=20261102annual"></script>
+  <script defer src="promotion.js?v=20261102annual"></script>
   <script defer src="suumo.js?v=20261030"></script>
   <script defer src="promotion-report.js?v=20261016"></script>
   <script defer src="vendor/pptxgenjs-4.0.1.bundle.js"></script>
-  <script defer src="meeting.js?v=20261102"></script>
+  <script defer src="meeting.js?v=20261102annual"></script>
 </head>
 <body>
   <header class="masthead">
     <div class="masthead-inner">
-      <div class="brand"><span class="brand-mark">H</span><span>空室業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div>
+      <div class="brand"><span class="brand-mark">H</span><span>リーシング業務ダッシュボード</span><span class="prototype-pill">ハウジングロビー</span></div>
       <div class="asof" id="asof"></div>
     </div>
   </header>
@@ -105,7 +105,7 @@
           <p id="meeting-status" class="save-message" role="status" aria-live="polite"></p>
           <details class="meeting-checks"><summary>集計基準・出典・確認事項</summary><div id="meeting-sources"></div><p>成約率＝セルフ内見結果「申込」の人数÷セルフ内見利用人数。契約成立率とは異なります。前年も同じ集計方法です。過去の削除済みタスク・上書き済み項目は復元できません。</p></details>
           <div class="meeting-editor"><label>今月の振り返り<textarea id="meeting-review" rows="5" maxlength="4000" placeholder="良かった点、課題、数字から分かること"></textarea></label><label>次月の取り組み<textarea id="meeting-next" rows="5" maxlength="4000" placeholder="施策・担当・期限・狙う成果を記入"></textarea></label></div>
-          <div class="meeting-toolbar"><label class="meeting-password">管理用の合言葉<input id="meeting-passcode" type="password" autocomplete="off"></label><button type="button" class="secondary-button" id="meeting-save">文章を共有保存</button><button type="button" class="secondary-button" id="meeting-finalize">月末数値を確定保存</button><span class="footnote">保存先はアプリ専用領域。Asana・週報は変更しません。</span></div>
+          <div class="meeting-toolbar"><button type="button" class="secondary-button" id="meeting-save">文章を共有保存</button><button type="button" class="secondary-button" id="meeting-finalize">月末数値を確定保存</button><span class="footnote">社内ログインで保存できます。Asana・週報は変更しません。</span></div>
           <div id="meeting-preview" class="meeting-preview" aria-label="会議資料のプレビュー"></div>
         </div>
       </section>
@@ -113,19 +113,15 @@
       <div class="notice subtle" id="promo-notice">月を選ぶと、Asanaから申込と反響を集計します（数十秒かかることがあります）。</div>
       <div class="kpis" id="promo-kpis"></div>
       <section class="panel goals-panel" aria-labelledby="goals-title">
-        <div class="goals-heading"><div><p class="eyebrow">MONTHLY TARGETS</p><h2 id="goals-title">月次目標</h2></div><span id="goals-month" class="goals-month"></span></div>
+        <div class="goals-heading"><div><p class="eyebrow">APPLICATION TARGETS</p><h2 id="goals-title">申込数の目標</h2></div><span id="goals-month" class="goals-month"></span></div>
         <div id="goals-cards" class="goals-cards" aria-live="polite"></div>
         <details id="goals-editor" class="goals-editor">
-          <summary>目標を入力・編集<span>管理者用</span></summary>
+          <summary>12か月の目標をまとめて入力<span>年間一覧</span></summary>
           <form id="goals-form">
-            <p id="goals-editor-month" class="goals-editor-month"></p>
-            <div class="goals-inputs">
-              <label for="goal-response">総反響数<span class="goals-input-wrap"><input id="goal-response" name="response" type="number" min="0" max="1000000" step="1" inputmode="numeric" placeholder="例：100"><span>人</span></span></label>
-              <label for="goal-application">申込数<span class="goals-input-wrap"><input id="goal-application" name="application" type="number" min="0" max="1000000" step="1" inputmode="numeric" placeholder="例：30"><span>件</span></span></label>
-              <label for="goal-contract">成約数<span class="goals-input-wrap"><input id="goal-contract" name="contract" type="number" min="0" max="1000000" step="1" inputmode="numeric" placeholder="例：20"><span>件</span></span></label>
-            </div>
-            <p class="goals-hint">空欄は未設定。総反響は既存集計の「人数」基準です。成約数は目標のみ保存でき、実績・達成率は集計連携後に表示します。</p>
-            <div class="goals-actions"><label for="goal-passcode">管理用の合言葉<input id="goal-passcode" type="password" autocomplete="off" required></label><button type="submit" class="primary-button" id="goals-save" disabled>この月の目標を保存</button><button type="button" class="secondary-button" id="goals-reload">保存値を再読込</button></div>
+            <div class="goals-yearbar"><label for="goals-year">対象年<select id="goals-year"></select></label><p id="goals-editor-month" class="goals-editor-month">1月〜12月の申込数目標</p><span id="goals-year-total"></span></div>
+            <div class="goals-inputs" id="goals-annual-inputs"></div>
+            <p class="goals-hint">申込数（成約数と同義）の目標を年単位でまとめて保存します。空欄＝未設定、0＝目標0件。未設定・目標0件では達成率を計算しません。</p>
+            <div class="goals-actions"><button type="submit" class="primary-button" id="goals-save" disabled>12か月の目標を一括保存</button><button type="button" class="secondary-button" id="goals-reload">保存値を再読込</button><span class="goals-hint">社内ログインで保存できます。</span></div>
             <p id="goals-message" class="goals-message" role="status"></p>
           </form>
         </details>

@@ -163,7 +163,7 @@
     $('meeting-month').textContent = `${month} の会議資料`;
     $('meeting-preview').innerHTML = ''; $('meeting-sources').textContent = '';
     $('meeting-review').value = drafts.get(month)?.review || ''; $('meeting-next').value = drafts.get(month)?.next || '';
-    $('meeting-passcode').value = ''; controls(true); message('保存内容と集計データを読み込んでいます…');
+    controls(true); message('保存内容と集計データを読み込んでいます…');
     try {
       const d = await window.Api.meetingDraft(target);
       if (ticket !== generation) return;
@@ -191,10 +191,9 @@
     const body = {month, revision: draft.revision, ...values(), finalize};
     const signature = JSON.stringify(body);
     if (!retry || retry.signature !== signature) retry = {signature, id: window.Api.newId()};
-    const passcode = $('meeting-passcode').value; $('meeting-passcode').value = '';
     controls(true); message(finalize ? '最新データを検証して確定保存しています…' : '文章を共有保存しています…');
     try {
-      const saved = await window.Api.saveMeeting({...body, requestId: retry.id, passcode});
+      const saved = await window.Api.saveMeeting({...body, requestId: retry.id});
       if (saved.month !== month || !Number.isInteger(saved.revision)) throw new Error('保存結果を確認できません');
       draft = saved; if (saved.snapshot) data = saved.snapshot;
       drafts.delete(month); retry = null; draw(); message(finalize ? '月末数値を確定保存しました。' : '文章を共有保存しました。');

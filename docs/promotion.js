@@ -61,7 +61,7 @@
     catch (err) { if (select.value === month) el('promo-notice').textContent = `集計できませんでした：${err.message}`; return; }
     if (select.value !== month) return; // 途中で月を切り替えた
     const a = d.application, r = d.response;
-    if (window.PromotionGoals) window.PromotionGoals.setActuals(month, {response: r.total.people, application: a.total, contract: null}, d);
+    if (window.PromotionGoals) window.PromotionGoals.setActuals(month, {application: a.total}, d);
     const applied = r.byResult?.['申込']?.people || 0;
     el('promo-asof').textContent = `集計 ${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(d.asOf))}`;
     el('promo-notice').textContent = `${monthLabel(month)}（${d.range.start}〜${d.range.end}）の集計です。${month === jst.slice(0,7) ? '当月は途中経過で、登録が進むと件数が変わります。' : ''}${r.excluded ? `登録エラーとみられる空タスク${r.excluded}件を除外しました。` : ''}`;
