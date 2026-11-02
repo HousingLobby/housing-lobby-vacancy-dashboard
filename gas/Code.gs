@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-11-02-annual-application-goals';
+const APP_VERSION = '2026-11-02-goals-only';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -150,9 +150,6 @@ function handle_(action, body) {
     case 'setPromotionGoals': return setPromotionGoals_(body);
     case 'annualPromotionGoals': return getAnnualPromotionGoals_(body.year);
     case 'setAnnualPromotionGoals': return setAnnualPromotionGoals_(body);
-    case 'meetingDraft': return meetingDraft_(body.month);
-    case 'meetingData': return meetingData_(body.month);
-    case 'saveMeeting': return saveMeeting_(body);
     case 'lpStatus': return lpStatus_(body.task);
     case 'status': return statusInfo_();
     case 'reportData': return reportData_(body);
@@ -818,132 +815,6 @@ function goalMonth_(month) {
   return month;
 }
 
-/* 会議資料：Asanaは読取のみ。週報はファイルIDで取得し、移動・改名に影響されない。
- * Graph Excel APIのアプリ権限制限を避け、XLSXの保存済みセル値だけを読む。
- * 数式は実行せず、最終列の戸数と率を照合する。不一致は欠測扱い。 */
-function meetingDraft_(month) {
-  if (!CURRENT_USER) throw new Error(AUTH_ERROR);
-  const raw = persistGet_('MR' + goalMonth_(month).replace('-', ''));
-  return raw ? JSON.parse(raw) : {month: month, revision: 0, review: '', next: '', snapshot: null};
-}
-
-function meetingWorkbook_(months) {
-  const drive = 'b!uWbFFqgH5Ua3uaqza-aacel6pdQwy8FOmyZFhh_m8PW-dvlEgNLVS7Elv2KMIldQ';
-  const item = '01QSWWG2VO3BW7O3LCP5EIXADCAMLWDBGH';
-  const token = graphToken_(), base = '/drives/' + drive + '/items/' + item;
-  const info = graphGet_(token, base + '?$select=name,webUrl,lastModifiedDateTime');
-  const res = UrlFetchApp.fetch('https://graph.microsoft.com/v1.0' + base + '/content', {
-    headers: {Authorization: 'Bearer ' + token}, muteHttpExceptions: true});
-  if (res.getResponseCode() !== 200) throw new Error('Teams週報を取得できません（' + res.getResponseCode() + '）');
-  const entries = {};
-  Utilities.unzip(res.getBlob().setContentType('application/zip')).forEach(b => { entries[b.getName()] = b; });
-  const xml = path => { if (!entries[path]) throw new Error('週報の構造を確認してください：' + path); return XmlService.parse(entries[path].getDataAsString('UTF-8')).getRootElement(); };
-  const ns = XmlService.getNamespace('http://schemas.openxmlformats.org/spreadsheetml/2006/main');
-  const rid = XmlService.getNamespace('http://schemas.openxmlformats.org/officeDocument/2006/relationships');
-  const textOf = e => !e ? '' : e.getText() + e.getChildren().map(textOf).join('');
-  const strings = entries['xl/sharedStrings.xml'] ? xml('xl/sharedStrings.xml').getChildren('si', ns).map(textOf) : [];
-  const rels = {};
-  xml('xl/_rels/workbook.xml.rels').getChildren().forEach(e => { rels[e.getAttribute('Id').getValue()] = e.getAttribute('Target').getValue(); });
-  const sheets = xml('xl/workbook.xml').getChild('sheets', ns).getChildren('sheet', ns);
-  const result = {};
-  months.forEach(month => {
-    const parts = month.split('-').map(Number), expected = '【新書式】' + parts[0] + '年' + parts[1] + '月入居率進捗表';
-    const found = sheets.filter(s => s.getAttribute('name').getValue().trim() === expected);
-    if (found.length !== 1) { result[month] = {rows: [], warnings: ['週報の月タブが一意に見つかりません：' + expected]}; return; }
-    const s = found[0], target = rels[s.getAttribute('id', rid).getValue()];
-    const path = target.charAt(0) === '/' ? target.slice(1) : 'xl/' + target.replace(/^\.\//, '');
-    const cells = {};
-    xml(path).getChild('sheetData', ns).getChildren('row', ns).forEach(row => row.getChildren('c', ns).forEach(c => {
-      const addr = c.getAttribute('r').getValue(), type = c.getAttribute('t');
-      const t = type ? type.getValue() : '', v = c.getChild('v', ns);
-      cells[addr] = t === 's' ? strings[Number(v && v.getText())] : t === 'inlineStr' ? textOf(c.getChild('is', ns)) : t === 'e' ? null : v && v.getText() !== '' ? Number(v.getText()) : null;
-    }));
-    result[month] = meetingRatesFromCells_(month, cells);
-    result[month].source = {name: info.name, url: info.webUrl, modifiedAt: info.lastModifiedDateTime, sheet: expected, columns: 'AP（評価入居率）・AU（入居率）の最終列'};
-  });
-  return result;
-}
-
-function meetingRatesFromCells_(month, cells) {
-  const warnings = [], rows = [];
-  const normal = s => String(s || '').normalize('NFKC').replace(/\s/g, '');
-  if (normal(cells.AL4) !== '評価入居率' || normal(cells.AQ4) !== '入居率' || ['G5', 'L5', 'Q5', 'AF5', 'AK5', 'AP5', 'AU5'].some(a => normal(cells[a]) !== '最終'))
-    return {month: month, rows: [], warnings: ['週報の見出し・最終列の配置が想定と異なります']};
-  [[8, '長崎中央'], [11, '長崎北'], [18, '諫早'], [21, '大村'], [28, '全体']].forEach(pair => {
-    const r = pair[0], name = pair[1];
-    if (!/小計|全体計/.test(cells['A' + r] || '')) { warnings.push(name + '：小計行の位置を確認してください'); return; }
-    const cols = ['G', 'L', 'Q', 'AF', 'AK'], vals = cols.map(c => cells[c + r]);
-    const valid = vals.every(v => typeof v === 'number' && isFinite(v) && v >= 0 && v % 1 === 0) && vals[0] > 0;
-    const row = {name: name, management: valid ? vals[0] : null, occupancy: null, evaluation: null};
-    ['occupancy', 'evaluation'].forEach((key, i) => {
-      const stored = cells[(i ? 'AP' : 'AU') + r];
-      const expected = valid ? 1 - (i ? vals[1] - vals[3] - vals[4] : vals[1] + vals[2]) / vals[0] : null;
-      if (expected === null || expected < 0 || expected > 1 || typeof stored !== 'number' || !isFinite(stored) || Math.abs(stored - expected) > 0.00001) warnings.push(name + '・' + (i ? '評価入居率' : '入居率') + '：最終列の戸数と保存済み率が一致しません');
-      else row[key] = stored;
-    });
-    rows.push(row);
-  });
-  return {month: month, rows: rows, warnings: warnings};
-}
-
-function meetingData_(month) {
-  if (!CURRENT_USER) throw new Error(AUTH_ERROR);
-  goalMonth_(month);
-  const previous = (Number(month.slice(0, 4)) - 1) + month.slice(4);
-  const warnings = [], data = {month: month, previous: previous, asOf: new Date().toISOString(), current: null, prior: null, rates: {}, warnings: warnings};
-  [month, previous].forEach((m, i) => {
-    try {
-      const p = buildPromotion_(m); // 過去月もAsanaに直接照会。現在値やキャッシュで代用しない。
-      delete p.application.unset; delete p.response.byProperty;
-      data[i ? 'prior' : 'current'] = p;
-    } catch (e) { warnings.push(m + '：Asana集計を取得できません。再取得してください'); }
-  });
-  try { data.rates = meetingWorkbook_([month, previous]); }
-  catch (e) { warnings.push('Teams入居率週報を取得できません。Microsoft連携の権限・設定を確認してください'); }
-  [month, previous].forEach(m => {
-    if (monthRange_(m).end >= todayJst_()) {
-      data.rates[m] = {rows: [], warnings: ['月末最終日の終了前です。入居率はまだ確定できません']};
-    }
-    (data.rates[m] && data.rates[m].warnings || []).forEach(w => warnings.push(m + '：' + w));
-  });
-  return data;
-}
-
-function saveMeeting_(body) {
-  if (!CURRENT_USER) throw new Error(AUTH_ERROR);
-  const month = goalMonth_(body.month);
-  if (!/^[A-Za-z0-9-]{8,100}$/.test(body.requestId || '')) throw new Error('保存IDが正しくありません');
-  if (typeof body.review !== 'string' || typeof body.next !== 'string' || body.review.length > 4000 || body.next.length > 4000) throw new Error('文章は各4,000文字以内で入力してください');
-  const before = meetingDraft_(month);
-  const signature = JSON.stringify([month, body.revision, body.review, body.next, body.finalize === true]);
-  // 通信の再送で確定データを再取得・差し替えしない。
-  if (before.requestId === body.requestId) {
-    if (before.signature !== signature) throw new Error('保存IDが重複しています。開き直してください');
-    return before;
-  }
-  let snapshot = null;
-  if (body.finalize === true) {
-    if (monthRange_(month).end >= todayJst_()) throw new Error('月末最終日の終了後に確定してください');
-    if (before.snapshot) throw new Error('この月は確定済みです。数値は上書きしません');
-    snapshot = meetingData_(month);
-    if (snapshot.warnings.length || !snapshot.current || !snapshot.prior) throw new Error('未取得・要確認のデータがあります。数値を確認してから確定してください');
-  }
-  const lock = LockService.getScriptLock(); lock.waitLock(15000);
-  try {
-    const prior = meetingDraft_(month);
-    if (prior.requestId === body.requestId) {
-      if (prior.signature !== signature) throw new Error('保存IDが重複しています。開き直してください');
-      return prior;
-    }
-    if (prior.revision !== body.revision) throw new Error('別の端末で変更されています。入力文を控えてから再読込してください');
-    const record = {month: month, revision: prior.revision + 1, review: body.review, next: body.next,
-      snapshot: prior.snapshot || snapshot, requestId: body.requestId, signature: signature, updatedAt: new Date().toISOString(), updatedBy: String(CURRENT_USER.name || '管理者').slice(0, 100)};
-    if (JSON.stringify(record).length > 70000) throw new Error('集計データが大きすぎます。保存せず管理者に確認してください');
-    persistPut_('MR' + month.replace('-', ''), JSON.stringify(record));
-    return record;
-  } finally { lock.releaseLock(); }
-}
-
 function readPromotionGoals_(month) {
   const raw = persistGet_('GM' + goalMonth_(month).replace('-', ''));
   return raw ? JSON.parse(raw) : {revision: 0, targets: {response: null, application: null, contract: null}, history: []};
@@ -1116,12 +987,6 @@ function buildPromotion_(month) {
   const inquiry = rows.filter(x => x.f[sv.type] === '反響' || x.f[sv.type] === 'かってに内見');
   const broker = rows.filter(x => x.f[sv.type] === '仲介同行');
   const response = {
-    selfViewing: (() => {
-      const visits = inquiry.filter(x => x.f[sv.type] === 'かってに内見');
-      return {total: axisCount(visits, () => '合計')['合計'] || {people: 0, properties: 0},
-        applied: (axisCount(visits.filter(x => x.f[sv.result] === '申込'), () => '合計')['合計'] || {people: 0}).people,
-        byStore: axisCount(visits, x => x.f[sv.store])};
-    })(),
     total: axisCount(inquiry, () => '合計')['合計'] || {people: 0, properties: 0},
     byType: axisCount(inquiry, x => x.f[sv.type]),
     bySource: axisCount(inquiry, x => x.f[sv.source]),

@@ -12,7 +12,7 @@
   if (!$('goals-form')) return;
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const fmt = n => n.toLocaleString('ja-JP');
-  const years = new Map(), drafts = new Map();
+  const years = new Map(), drafts = new Map(), legacyMonths = new Map();
   let month = '', year = '', actual = null, meta = null, generation = 0, saving = false, retry = null;
   const months = y => Array.from({length: 12}, (_, i) => `${y}-${String(i + 1).padStart(2, '0')}`);
   const fields = () => Array.from($('goals-annual-inputs').querySelectorAll('input'));
@@ -41,7 +41,7 @@
     total(); controls();
   }
   function draw() {
-    const r = years.get(month.slice(0, 4)), target = r?.targets[month], pct = achievement(actual, target);
+    const r = years.get(month.slice(0, 4)) || legacyMonths.get(month), target = r?.targets[month], pct = achievement(actual, target);
     const status = !r ? '目標読込待ち' : target == null ? '目標未設定' : target === 0 ? '目標0・達成率対象外' : !Number.isFinite(actual) ? '実績読込待ち' : actual >= target ? '目標達成' : `あと${fmt(target - actual)}件`;
     $('goals-month').textContent = month ? `${month.slice(0, 4)}年${Number(month.slice(5))}月` : '';
     $('goals-cards').innerHTML = `<article class="goal-card${pct !== null && pct >= 100 ? ' is-achieved' : ''}"><div class="goal-card-top"><h3>申込数</h3><span>${esc(status)}</span></div><div class="goal-card-value"><strong>${pct === null ? '—' : pct.toFixed(1)}<small>${pct === null ? '' : '%'}</small></strong><span>達成率</span></div><div class="goal-track" role="img" aria-label="${esc(pct === null ? status : '達成率' + pct.toFixed(1) + '%')}"><span style="width:${pct === null ? 0 : Math.min(100, Math.max(0, pct))}%"></span></div><div class="goal-card-bottom"><span>実績 <b>${Number.isFinite(actual) ? fmt(actual) + '件' : '—'}</b></span><span>目標 <b>${target == null ? '—' : fmt(target) + '件'}</b></span></div><p>申込日ベース · 申込数と成約数を同じ目標として管理</p></article>`;
@@ -61,7 +61,23 @@
       const r = validate(await window.Api.annualPromotionGoals(y), y);
       if (ticket !== generation) return;
       years.set(y, r); fill(); draw(); message(drafts.has(y) ? '未保存の入力内容を復元しました。保存するまでは達成率に反映しません。' : '');
-    } catch (e) { if (ticket === generation) { fill(); draw(); message(`目標を取得できませんでした：${e.message}`, true); } }
+    } catch (e) {
+      if (ticket !== generation) return;
+      if (e.message === '不明な操作です' && window.Api.promotionGoals && month.startsWith(y + '-')) {
+        // 旧GASでも既存の月次目標の閲覧は維持。年間データを推測したり、旧APIで保存しない。
+        const requestedMonth = month;
+        try {
+          const old = await window.Api.promotionGoals(requestedMonth);
+          if (ticket !== generation) return;
+          const value = old?.targets?.application;
+          if (old.month !== requestedMonth || !(value === null || Number.isSafeInteger(value) && value >= 0)) throw new Error('旧目標の形式を確認できません');
+          legacyMonths.set(requestedMonth, {...old, targets: {[requestedMonth]: value}});
+          fill(); draw(); message('既存の月次目標を表示しています。年間一括保存にはGASの再デプロイが必要です。', true);
+          return;
+        } catch (_) { /* 通常の取得失敗表示へ */ }
+      }
+      if (ticket === generation) { fill(); draw(); message(`目標を取得できませんでした：${e.message}`, true); }
+    }
   }
   window.PromotionGoals = {
     setMonth(next) {
@@ -73,7 +89,7 @@
       if (year && !options.includes(year)) options.push(year);
       $('goals-year').innerHTML = options.sort().map(n => `<option value="${n}">${n}年</option>`).join('');
       $('goals-year').value = year || y;
-      if (!year || year !== y) load(y);
+      if (!year || year !== y || !years.has(y)) load(y);
       else { fill(); draw(); }
     },
     setActuals(forMonth, values, source) { if (month === forMonth) { actual = values.application; meta = source; draw(); } }

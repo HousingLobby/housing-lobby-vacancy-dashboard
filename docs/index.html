@@ -9,24 +9,21 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%23102841'/%3E%3Cpath d='M12 31 32 14l20 17v21H12z' fill='none' stroke='%23f4bb61' stroke-width='5' stroke-linejoin='round'/%3E%3Cpath d='M26 52V36h12v16' fill='none' stroke='%23f4bb61' stroke-width='5'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css?v=20261102goals">
   <link rel="stylesheet" href="promotion-goals.css?v=20261102annual">
-  <link rel="stylesheet" href="meeting.css?v=20261102">
   <script defer src="vendor/msal-browser-2.38.3.min.js"></script>
   <script defer src="config.js?v=20261008gas2"></script>
   <script defer src="auth.js?v=20261011e"></script>
   <script defer src="snapshot-current.js?v=20261008auth"></script>
   <script defer src="patrol-store.js?v=20261002"></script>
-  <script defer src="api.js?v=20261102annual"></script>
+  <script defer src="api.js?v=20261102goalsonly"></script>
   <script defer src="nav.js?v=20261101"></script>
   <script defer src="outbox.js?v=20261008auth"></script>
   <script defer src="outbox-bar.js?v=20261008auth"></script>
   <script defer src="app.js?v=20261101b"></script>
   <script defer src="monthend.js?v=20261101m"></script>
-  <script defer src="promotion-goals.js?v=20261102annual"></script>
+  <script defer src="promotion-goals.js?v=20261102goalsonly"></script>
   <script defer src="promotion.js?v=20261102annual"></script>
   <script defer src="suumo.js?v=20261030"></script>
   <script defer src="promotion-report.js?v=20261016"></script>
-  <script defer src="vendor/pptxgenjs-4.0.1.bundle.js"></script>
-  <script defer src="meeting.js?v=20261102annual"></script>
 </head>
 <body>
   <header class="masthead">
@@ -97,18 +94,6 @@
       <div class="section-heading"><div><p class="eyebrow">LEASING PROMOTION</p><h1 id="promotion-title">入居促進</h1></div><p class="section-meta" id="promo-asof"></p></div>
       <div class="filters"><label>対象月<select id="promo-month"></select></label><label>&nbsp;<button type="button" class="secondary-button" id="promo-refresh">最新に更新</button></label><label>&nbsp;<button type="button" class="primary-button" id="promo-report">月次レポートを作成</button></label><label>&nbsp;<button type="button" class="secondary-button" id="promo-csv">CSVでダウンロード</button></label><label>&nbsp;<button type="button" class="primary-button" id="me-btn">月末集計</button></label></div>
       <div class="panel hk-monthend" id="me-panel" hidden><div class="panel-heading"><h2>月末集計</h2><span>反響の数字・SUUMOの登録漏れ・仲介同行の確認</span></div><div class="hk-last" id="me-last"></div><p class="save-message" id="me-status" role="status"></p><div id="me-result" hidden></div><p class="footnote" style="margin:8px 0 0">対象月は上の「対象月」です。SUUMOの漏れ確認は、先に「反響対応」ページの「反響データ確認」を長崎店・県央店の両方で実行しておくと正確です。Asanaには書き込みません。</p></div>
-      <section class="panel meeting-panel" aria-labelledby="meeting-title">
-        <div class="panel-heading"><div><p class="eyebrow">MONTH-END PRESENTATION</p><h2 id="meeting-title">月末会議資料</h2></div><button class="secondary-button" id="meeting-open" type="button" aria-expanded="false" aria-controls="meeting-workspace">資料を作成・編集</button></div>
-        <p class="footnote">前年同月のAsana集計とTeams週報の「最終」列を参照。編集できる16:9のPowerPointを作成します。</p>
-        <div id="meeting-workspace" hidden>
-          <div class="meeting-toolbar"><strong id="meeting-month"></strong><span id="meeting-state"></span><button type="button" class="secondary-button" id="meeting-reload">数値を再取得</button><button type="button" class="primary-button" id="meeting-download" disabled>PowerPointを保存</button></div>
-          <p id="meeting-status" class="save-message" role="status" aria-live="polite"></p>
-          <details class="meeting-checks"><summary>集計基準・出典・確認事項</summary><div id="meeting-sources"></div><p>成約率＝セルフ内見結果「申込」の人数÷セルフ内見利用人数。契約成立率とは異なります。前年も同じ集計方法です。過去の削除済みタスク・上書き済み項目は復元できません。</p></details>
-          <div class="meeting-editor"><label>今月の振り返り<textarea id="meeting-review" rows="5" maxlength="4000" placeholder="良かった点、課題、数字から分かること"></textarea></label><label>次月の取り組み<textarea id="meeting-next" rows="5" maxlength="4000" placeholder="施策・担当・期限・狙う成果を記入"></textarea></label></div>
-          <div class="meeting-toolbar"><button type="button" class="secondary-button" id="meeting-save">文章を共有保存</button><button type="button" class="secondary-button" id="meeting-finalize">月末数値を確定保存</button><span class="footnote">社内ログインで保存できます。Asana・週報は変更しません。</span></div>
-          <div id="meeting-preview" class="meeting-preview" aria-label="会議資料のプレビュー"></div>
-        </div>
-      </section>
       <p class="footnote" id="promo-export-msg" role="status" style="margin:-8px 0 12px"></p>
       <div class="notice subtle" id="promo-notice">月を選ぶと、Asanaから申込と反響を集計します（数十秒かかることがあります）。</div>
       <div class="kpis" id="promo-kpis"></div>
