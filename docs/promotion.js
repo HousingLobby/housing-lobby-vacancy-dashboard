@@ -8,12 +8,12 @@
   const jst = new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const monthLabel = m => `${Number(m.slice(0,4))}年${Number(m.slice(5))}月`;
   const months = [];
-  for (let i = 0; i < 18; i++) {
+  for (let i = -3; i < 18; i++) {
     const d = new Date(Date.UTC(Number(jst.slice(0,4)), Number(jst.slice(5,7)) - 1 - i, 1));
     months.push(d.toISOString().slice(0,7));
   }
   const select = el('promo-month');
-  select.innerHTML = months.map((m, i) => `<option value="${m}">${monthLabel(m)}${i === 0 ? '（当月・途中経過）' : ''}</option>`).join('');
+  select.innerHTML = months.map(m => `<option value="${m}" ${m === jst.slice(0,7) ? 'selected' : ''}>${monthLabel(m)}${m === jst.slice(0,7) ? '（当月・途中経過）' : m > jst.slice(0,7) ? '（目標設定）' : ''}</option>`).join('');
   let started = false;
 
   const waitDash = () => new Promise(resolve => { const t = () => window.DASH ? resolve(window.DASH) : setTimeout(t, 100); t(); });
@@ -52,17 +52,19 @@
   };
 
   const render = async (month, refresh) => {
+    if (window.PromotionGoals) window.PromotionGoals.setMonth(month);
     const dash = await waitDash();
     el('promo-notice').textContent = `${monthLabel(month)}の申込・反響をAsanaから集計しています…（数十秒かかることがあります）`;
     el('promo-kpis').innerHTML = ''; el('promo-apps').innerHTML = ''; el('promo-resp').innerHTML = ''; el('promo-zero').innerHTML = '';
     let d;
     try { d = await window.Api.promotion(month, refresh); }
-    catch (err) { el('promo-notice').textContent = `集計できませんでした：${err.message}`; return; }
+    catch (err) { if (select.value === month) el('promo-notice').textContent = `集計できませんでした：${err.message}`; return; }
     if (select.value !== month) return; // 途中で月を切り替えた
     const a = d.application, r = d.response;
+    if (window.PromotionGoals) window.PromotionGoals.setActuals(month, {response: r.total.people, application: a.total, contract: null}, d);
     const applied = r.byResult?.['申込']?.people || 0;
     el('promo-asof').textContent = `集計 ${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(d.asOf))}`;
-    el('promo-notice').textContent = `${monthLabel(month)}（${d.range.start}〜${d.range.end}）の集計です。${month === months[0] ? '当月は途中経過で、登録が進むと件数が変わります。' : ''}${r.excluded ? `登録エラーとみられる空タスク${r.excluded}件を除外しました。` : ''}`;
+    el('promo-notice').textContent = `${monthLabel(month)}（${d.range.start}〜${d.range.end}）の集計です。${month === jst.slice(0,7) ? '当月は途中経過で、登録が進むと件数が変わります。' : ''}${r.excluded ? `登録エラーとみられる空タスク${r.excluded}件を除外しました。` : ''}`;
     el('promo-kpis').innerHTML = [
       ['申込数', `${fmt(a.total)}件`, '【空室一覧】申込日ベース', 'featured'],
       ['反響（人数）', `${fmt(r.total.people)}人`, `物件ごと ${fmt(r.total.properties)}件`, ''],

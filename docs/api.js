@@ -72,6 +72,11 @@
     },
     patrols: task => request({action: 'patrols', task}),
     status: () => request({action: 'status'}),
+    promotionGoals: month => request({action: 'promotionGoals', month}),
+    meetingDraft: month => request({action: 'meetingDraft', month}),
+    meetingData: month => request({action: 'meetingData', month}, null, 240000),
+    saveMeeting: body => request(null, {action: 'saveMeeting', ...body}, 240000),
+    setPromotionGoals: body => request(null, {action: 'setPromotionGoals', ...body}),
     promotion: (month, refresh) => {
       if (!apiUrl) return Promise.reject(new Error('共有データに接続していません'));
       return request({action: 'promotion', month, ...(refresh ? {refresh: '1'} : {})});
