@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-11-01-monthend-gas2';
+const APP_VERSION = '2026-11-02-monthly-goals';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -146,6 +146,8 @@ function handle_(action, body) {
     case 'snapshot': return getSnapshot_(body.refresh === '1' || body.refresh === true);
     case 'patrols': return getPatrols_(body.task);
     case 'promotion': return getPromotion_(body.month, body.refresh === '1' || body.refresh === true);
+    case 'promotionGoals': return getPromotionGoals_(body.month);
+    case 'setPromotionGoals': return setPromotionGoals_(body);
     case 'lpStatus': return lpStatus_(body.task);
     case 'status': return statusInfo_();
     case 'reportData': return reportData_(body);
@@ -805,6 +807,54 @@ function recordDailyOccupancy() {
 }
 
 /* ---------- 入居促進（月次の申込・反響） ---------- */
+// 目標はAsanaとは別に保存する。空欄＝未設定、0＝目標0件（達成率は算出しない）。
+function goalMonth_(month) {
+  if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month || '')) throw new Error('対象月が正しくありません');
+  return month;
+}
+
+function readPromotionGoals_(month) {
+  const raw = persistGet_('GM' + goalMonth_(month).replace('-', ''));
+  return raw ? JSON.parse(raw) : {revision: 0, targets: {response: null, application: null, contract: null}, history: []};
+}
+
+function getPromotionGoals_(month) {
+  if (!CURRENT_USER) throw new Error(AUTH_ERROR);
+  const record = readPromotionGoals_(month);
+  return {month: month, revision: record.revision, targets: record.targets,
+    updatedAt: record.updatedAt || null, updatedBy: record.updatedBy || null};
+}
+
+function setPromotionGoals_(body) {
+  if (!CURRENT_USER) throw new Error(AUTH_ERROR);
+  if (!passOk_('ADMIN_PASSCODE', body.passcode)) throw new Error('管理用の合言葉が違います');
+  const month = goalMonth_(body.month), targets = {};
+  ['response', 'application', 'contract'].forEach(key => {
+    const v = (body.targets || {})[key];
+    if (v === null || v === '') targets[key] = null;
+    else {
+      if (typeof v !== 'number' || !isFinite(v) || v < 0 || v % 1 || v > 1000000) throw new Error('目標は0〜1,000,000の整数で入力してください');
+      targets[key] = v;
+    }
+  });
+  if (!/^[A-Za-z0-9-]{8,100}$/.test(body.requestId || '')) throw new Error('保存IDが正しくありません');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const prior = readPromotionGoals_(month);
+    if (prior.requestId === body.requestId) {
+      if (JSON.stringify(prior.targets) !== JSON.stringify(targets)) throw new Error('保存IDが重複しています。開き直してください');
+      return getPromotionGoals_(month);
+    }
+    if (body.revision !== prior.revision) throw new Error('別の端末で目標が変更されました。再読込してから保存してください');
+    const at = new Date().toISOString(), by = String(CURRENT_USER.name || '管理者').slice(0, 100);
+    const history = (prior.history || []).concat([{at: at, by: by, before: prior.targets, after: targets}]).slice(-20);
+    persistPut_('GM' + month.replace('-', ''), JSON.stringify({revision: prior.revision + 1, targets: targets,
+      updatedAt: at, updatedBy: by, requestId: body.requestId, history: history}));
+    return getPromotionGoals_(month);
+  } finally { lock.releaseLock(); }
+}
+
 /* 個人名は返さない。件数と内訳だけ。
    申込：【空室一覧】の全タスク（未完了＋対象月以降に完了）のうち「申込日」が対象月のもの（ステータスは問わない・親タスクのみ）
    反響：【セルフ内見予約表】のうち期日（反響受付日／内見日）が対象月のもの。2軸（物件ごと／人物名ごと）で数える */
