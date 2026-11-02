@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-11-02-meeting-report';
+const APP_VERSION = '2026-11-02-annual-application-goals';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -148,6 +148,8 @@ function handle_(action, body) {
     case 'promotion': return getPromotion_(body.month, body.refresh === '1' || body.refresh === true);
     case 'promotionGoals': return getPromotionGoals_(body.month);
     case 'setPromotionGoals': return setPromotionGoals_(body);
+    case 'annualPromotionGoals': return getAnnualPromotionGoals_(body.year);
+    case 'setAnnualPromotionGoals': return setAnnualPromotionGoals_(body);
     case 'meetingDraft': return meetingDraft_(body.month);
     case 'meetingData': return meetingData_(body.month);
     case 'saveMeeting': return saveMeeting_(body);
@@ -909,7 +911,6 @@ function meetingData_(month) {
 
 function saveMeeting_(body) {
   if (!CURRENT_USER) throw new Error(AUTH_ERROR);
-  if (!passOk_('ADMIN_PASSCODE', body.passcode)) throw new Error('管理用の合言葉が違います');
   const month = goalMonth_(body.month);
   if (!/^[A-Za-z0-9-]{8,100}$/.test(body.requestId || '')) throw new Error('保存IDが正しくありません');
   if (typeof body.review !== 'string' || typeof body.next !== 'string' || body.review.length > 4000 || body.next.length > 4000) throw new Error('文章は各4,000文字以内で入力してください');
@@ -950,38 +951,70 @@ function readPromotionGoals_(month) {
 
 function getPromotionGoals_(month) {
   if (!CURRENT_USER) throw new Error(AUTH_ERROR);
-  const record = readPromotionGoals_(month);
-  return {month: month, revision: record.revision, targets: record.targets,
+  goalMonth_(month);
+  const record = getAnnualPromotionGoals_(month.slice(0, 4));
+  return {month: month, revision: record.revision, targets: {application: record.targets[month]},
     updatedAt: record.updatedAt || null, updatedBy: record.updatedBy || null};
 }
 
 function setPromotionGoals_(body) {
   if (!CURRENT_USER) throw new Error(AUTH_ERROR);
-  if (!passOk_('ADMIN_PASSCODE', body.passcode)) throw new Error('管理用の合言葉が違います');
-  const month = goalMonth_(body.month), targets = {};
-  ['response', 'application', 'contract'].forEach(key => {
-    const v = (body.targets || {})[key];
-    if (v === null || v === '') targets[key] = null;
+  throw new Error('目標の入力方法が変わりました。画面を再読み込みして年間一覧から保存してください');
+}
+
+function goalYear_(year) {
+  if (!/^20\d{2}$/.test(String(year || ''))) throw new Error('対象年が正しくありません');
+  return String(year);
+}
+
+function readAnnualPromotionGoals_(year) {
+  year = goalYear_(year);
+  const raw = persistGet_('YG' + year);
+  if (raw) return JSON.parse(raw);
+  // 旧保存値は申込数だけを引き継ぎ、反響・成約目標は削除せず原記録に残す。
+  const targets = {};
+  for (let i = 1; i <= 12; i++) {
+    const month = year + '-' + ('0' + i).slice(-2);
+    targets[month] = readPromotionGoals_(month).targets.application;
+  }
+  return {revision: 0, targets: targets, history: []};
+}
+
+function getAnnualPromotionGoals_(year) {
+  if (!CURRENT_USER) throw new Error(AUTH_ERROR);
+  year = goalYear_(year);
+  const r = readAnnualPromotionGoals_(year);
+  return {year: year, revision: r.revision, targets: r.targets, updatedAt: r.updatedAt || null, updatedBy: r.updatedBy || null};
+}
+
+function setAnnualPromotionGoals_(body) {
+  if (!CURRENT_USER) throw new Error(AUTH_ERROR);
+  const year = goalYear_(body.year), targets = {};
+  if (!body.targets || Array.isArray(body.targets) || Object.keys(body.targets).length !== 12) throw new Error('12か月すべての目標を指定してください');
+  for (let i = 1; i <= 12; i++) {
+    const month = year + '-' + ('0' + i).slice(-2), v = body.targets[month];
+    if (v === null || v === '') targets[month] = null;
     else {
       if (typeof v !== 'number' || !isFinite(v) || v < 0 || v % 1 || v > 1000000) throw new Error('目標は0〜1,000,000の整数で入力してください');
-      targets[key] = v;
+      targets[month] = v;
     }
-  });
+  }
   if (!/^[A-Za-z0-9-]{8,100}$/.test(body.requestId || '')) throw new Error('保存IDが正しくありません');
+  const signature = JSON.stringify([year, body.revision, targets]);
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    const prior = readPromotionGoals_(month);
+    const prior = readAnnualPromotionGoals_(year);
     if (prior.requestId === body.requestId) {
-      if (JSON.stringify(prior.targets) !== JSON.stringify(targets)) throw new Error('保存IDが重複しています。開き直してください');
-      return getPromotionGoals_(month);
+      if (prior.signature !== signature) throw new Error('保存IDが重複しています。開き直してください');
+      return getAnnualPromotionGoals_(year);
     }
     if (body.revision !== prior.revision) throw new Error('別の端末で目標が変更されました。再読込してから保存してください');
-    const at = new Date().toISOString(), by = String(CURRENT_USER.name || '管理者').slice(0, 100);
+    const at = new Date().toISOString(), by = String(CURRENT_USER.name || '社内利用者').slice(0, 100);
     const history = (prior.history || []).concat([{at: at, by: by, before: prior.targets, after: targets}]).slice(-20);
-    persistPut_('GM' + month.replace('-', ''), JSON.stringify({revision: prior.revision + 1, targets: targets,
-      updatedAt: at, updatedBy: by, requestId: body.requestId, history: history}));
-    return getPromotionGoals_(month);
+    persistPut_('YG' + year, JSON.stringify({revision: prior.revision + 1, targets: targets,
+      updatedAt: at, updatedBy: by, requestId: body.requestId, signature: signature, history: history}));
+    return getAnnualPromotionGoals_(year);
   } finally { lock.releaseLock(); }
 }
 
