@@ -8,7 +8,7 @@
  * スクリプトプロパティ：
  *   ASANA_TOKEN     Asana個人アクセストークン（必須）
  *   EDIT_PASSCODE   巡回登録用の合言葉（空欄なら合言葉なしで登録できる）
- *   ADMIN_PASSCODE  管理戸数登録用の合言葉（必須）
+ *   管理戸数の登録は確認済みの社内ログインを必須とする（管理用合言葉は不要）。
  *   HISTORY_SHEET_ID 日次入居率を記録するスプレッドシートID（任意）
  *   ASSIGNEE_NAGASAKI 長崎北・長崎中央・セキスイ・古里のサブタスク担当者（Asanaのメールアドレス）
  *   ASSIGNEE_KENOU    諫早・大村のサブタスク担当者（Asanaのメールアドレス）
@@ -136,7 +136,7 @@ function readRequest_(e) {
 
 // 認証の要らない入口（機械用・稼働確認）
 // 貼り替え・デプロイが反映されたか確認する目印（?action=ping の version）
-const APP_VERSION = '2026-11-02-goals-only';
+const APP_VERSION = '2026-11-05-management-login';
 
 const OPEN_ACTIONS = {lpQueue: true, lpUpdate: true, hankyoUpsert: true, hankyoCheckGet: true, hankyoCheckUpdate: true, monthEndGet: true, monthEndUpdate: true};
 
@@ -401,7 +401,7 @@ function readManagement_() {
 }
 
 function setManagement_(body) {
-  if (!passOk_('ADMIN_PASSCODE', body.passcode)) throw new Error('管理用の合言葉が違います');
+  if (!CURRENT_USER) throw new Error(AUTH_ERROR);
   if (!/^\d{4}-\d{2}$/.test(body.month || '')) throw new Error('対象月が正しくありません');
   const areas = {};
   CFG.areas.forEach(a => {
