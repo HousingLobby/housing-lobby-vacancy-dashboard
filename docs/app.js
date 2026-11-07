@@ -116,14 +116,16 @@
   // 空室状況・管理種別ごとの内訳（【募集中】の全タスク。4エリア以外は「その他」）
   const areaCols = [...areas, 'その他'];
   const areaOf = row => areas.includes(row.a) ? row.a : 'その他';
-  const crossTable = (tableId, label, valueOf, filterKey) => {
-    const values = [...new Set(data.vacancies.map(valueOf))].sort((a, b) => data.vacancies.filter(r => valueOf(r) === b).length - data.vacancies.filter(r => valueOf(r) === a).length);
-    const cell = (v, a) => data.vacancies.filter(r => valueOf(r) === v && (!a || areaOf(r) === a)).length;
-    el(tableId).innerHTML = `<thead><tr><th>${label}</th>${areaCols.map(a => `<th class="num">${a}</th>`).join('')}<th class="num">合計</th></tr></thead><tbody>${values.map(v => `<tr><td><strong>${esc(v)}</strong></td>${areaCols.map(a => `<td class="num">${pick(cell(v, a), {[filterKey]: v, a: a === 'その他' ? 'other' : a})}</td>`).join('')}<td class="num"><strong>${pick(cell(v), {[filterKey]: v})}</strong></td></tr>`).join('')}<tr class="total-row"><td>合計</td>${areaCols.map(a => `<td class="num">${data.vacancies.filter(r => areaOf(r) === a).length}</td>`).join('')}<td class="num">${data.vacancies.length}</td></tr></tbody>`;
+  // skip：表から外す値（空室状況の「空欄」＝入居中。合計にも含めない。2026-11-07）。戻り値は絞り込み用に全値
+  const crossTable = (tableId, label, valueOf, filterKey, skip) => {
+    const all = data.vacancies, src = skip ? all.filter(r => valueOf(r) !== skip) : all;
+    const values = [...new Set(all.map(valueOf))].sort((a, b) => all.filter(r => valueOf(r) === b).length - all.filter(r => valueOf(r) === a).length);
+    const cell = (v, a) => src.filter(r => valueOf(r) === v && (!a || areaOf(r) === a)).length;
+    el(tableId).innerHTML = `<thead><tr><th>${label}</th>${areaCols.map(a => `<th class="num">${a}</th>`).join('')}<th class="num">合計</th></tr></thead><tbody>${values.filter(v => v !== skip).map(v => `<tr><td><strong>${esc(v)}</strong></td>${areaCols.map(a => `<td class="num">${pick(cell(v, a), {[filterKey]: v, a: a === 'その他' ? 'other' : a})}</td>`).join('')}<td class="num"><strong>${pick(cell(v), {[filterKey]: v})}</strong></td></tr>`).join('')}<tr class="total-row"><td>合計</td>${areaCols.map(a => `<td class="num">${src.filter(r => areaOf(r) === a).length}</td>`).join('')}<td class="num">${src.length}</td></tr></tbody>`;
     return values;
   };
   const condOf = row => row.c || '空欄', kindOf = row => row.m || '種別なし';
-  const condValues = crossTable('status-table', '空室状況', condOf, 'c');
+  const condValues = crossTable('status-table', '空室状況', condOf, 'c', '空欄');
   const kindValues = crossTable('kind-table', '管理種別', kindOf, 'm');
   el('cond-filter').insertAdjacentHTML('beforeend', condValues.map(v => `<option>${esc(v)}</option>`).join(''));
   el('kind-filter').insertAdjacentHTML('beforeend', '<option value="__general">一般（一般管理・セキスイ）</option>' + kindValues.map(v => `<option>${esc(v)}</option>`).join(''));

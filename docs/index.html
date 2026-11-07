@@ -18,7 +18,7 @@
   <script defer src="nav.js?v=20261101"></script>
   <script defer src="outbox.js?v=20261008auth"></script>
   <script defer src="outbox-bar.js?v=20261008auth"></script>
-  <script defer src="app.js?v=20261107breakdown"></script>
+  <script defer src="app.js?v=20261107nokuran"></script>
   <script defer src="monthend.js?v=20261101m"></script>
   <script defer src="promotion-goals.js?v=20261107total"></script>
   <script defer src="promotion.js?v=20261107total"></script>
@@ -57,7 +57,7 @@
           <button type="button" role="tab" data-bd="area" class="on" aria-selected="true">エリア・種別</button><button type="button" role="tab" data-bd="status" aria-selected="false">空室状況</button><button type="button" role="tab" data-bd="kind" aria-selected="false">管理種別</button><button type="button" role="tab" data-bd="mgmt" id="bd-mgmt-tab" aria-selected="false">管理戸数の登録</button>
         </div>
         <div data-bd-panel="area"><p class="footnote" style="margin:0 0 8px">管理戸数は非公開・率のみ表示。対象は4エリアのサブ・一般（一般管理・セキスイ）。</p><div class="filters bd-view"><label>列の表示<select id="bd-cols"><option value="sum">合計のみ</option><option value="detail">①〜④の内訳も表示</option></select></label><label>行の表示<select id="bd-rows"><option value="area">エリア合計のみ</option><option value="sub">サブ・一般も表示</option></select></label></div><div class="table-scroll"><table id="summary-table" class="hide-detail hide-sub"><thead><tr><th>エリア・種別</th><th class="num col-detail">①原復済</th><th class="num col-detail">②原復未</th><th class="num col-sum">空室<br><small>①＋②</small></th><th class="num col-detail">③退去予定</th><th class="num col-detail">④募集止め</th><th class="num col-sum">退去予定・募集止め<br><small>③＋④</small></th><th class="num">⑤14日免除</th><th class="num">入居率</th><th class="num">評価入居率</th></tr></thead><tbody></tbody></table></div></div>
-        <div data-bd-panel="status" hidden><p class="footnote" style="margin:0 0 8px">Asana「空室状況」ごとの件数（【募集中】の全タスク）。</p><div class="table-scroll"><table id="status-table"></table></div></div>
+        <div data-bd-panel="status" hidden><p class="footnote" style="margin:0 0 8px">Asana「空室状況」ごとの件数（【募集中】の全タスク）。<br>※備考：入居中は含まない</p><div class="table-scroll"><table id="status-table"></table></div></div>
         <div data-bd-panel="kind" hidden><p class="footnote" style="margin:0 0 8px">管理種別ごとの件数（【募集中】の全タスク）。入居率の対象はサブ・一般管理・セキスイ物件です。</p><div class="table-scroll"><table id="kind-table"></table></div></div>
         <div data-bd-panel="mgmt" id="management-panel" hidden><p class="footnote" style="margin:0 0 8px">入居率の分母。全体会議資料「2.エリア別」の値（月ごと）。</p>
         <form id="management-form" class="mgmt-form">
