@@ -124,8 +124,8 @@
     el(tableId).innerHTML = `<thead><tr><th>${label}</th>${areaCols.map(a => `<th class="num">${a}</th>`).join('')}<th class="num">合計</th></tr></thead><tbody>${values.filter(v => v !== skip).map(v => `<tr><td><strong>${esc(v)}</strong></td>${areaCols.map(a => `<td class="num">${pick(cell(v, a), {[filterKey]: v, a: a === 'その他' ? 'other' : a})}</td>`).join('')}<td class="num"><strong>${pick(cell(v), {[filterKey]: v})}</strong></td></tr>`).join('')}<tr class="total-row"><td>合計</td>${areaCols.map(a => `<td class="num">${src.filter(r => areaOf(r) === a).length}</td>`).join('')}<td class="num">${src.length}</td></tr></tbody>`;
     return values;
   };
-  const condOf = row => row.c || '空欄', kindOf = row => row.m || '種別なし';
-  const condValues = crossTable('status-table', '空室状況', condOf, 'c', '空欄');
+  const condOf = row => row.c || '退去前', kindOf = row => row.m || '種別なし';
+  const condValues = crossTable('status-table', '空室状況', condOf, 'c', '退去前');
   const kindValues = crossTable('kind-table', '管理種別', kindOf, 'm');
   el('cond-filter').insertAdjacentHTML('beforeend', condValues.map(v => `<option>${esc(v)}</option>`).join(''));
   el('kind-filter').insertAdjacentHTML('beforeend', '<option value="__general">一般（一般管理・セキスイ）</option>' + kindValues.map(v => `<option>${esc(v)}</option>`).join(''));
@@ -147,19 +147,25 @@
     const b = e.target.closest('.cnt'); if (!b) return;
     const f = JSON.parse(b.dataset.f);
     el('area-filter').value = f.a || 'all'; el('status-filter').value = f.s || 'all';
-    el('cond-filter').value = f.c || 'all'; el('kind-filter').value = f.m || 'all'; el('search').value = '';
+    el('cond-filter').value = f.c || 'all'; el('kind-filter').value = f.m || 'all'; el('period-filter').value = 'all'; el('search').value = '';
     renderListings(); el('listing-panel').scrollIntoView({behavior: 'smooth', block: 'start'});
   });
 
+  const dayNum = d => Date.UTC(...d.split('-').map((v,i)=>i===1?Number(v)-1:Number(v)));
+  const vacancyDays = row => row.v ? Math.floor((dayNum(todayJst) - dayNum(row.v)) / 86400000) : null;
+  // 空室期間の絞り込み（解約日からの暦月。退去前・解約日不明は対象外）2026-11-07
+  const monthsAgo = n => { const [y,m,d] = todayJst.split('-').map(Number); const t = new Date(Date.UTC(y, m-1-n, 1)); const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth()+1, 0)).getUTCDate(); return `${t.getUTCFullYear()}-${String(t.getUTCMonth()+1).padStart(2,'0')}-${String(Math.min(d,last)).padStart(2,'0')}`; };
+  const periodOk = (row, p) => { if (p === 'all') return true; if (!row.v || row.v > todayJst) return false; return p === 'in3' ? row.v > monthsAgo(3) : row.v <= monthsAgo(p === 'over3' ? 3 : p === 'over6' ? 6 : 12); };
+  const listDays = row => { const d = vacancyDays(row); return d === null ? '<span class="check-unknown">—</span>' : d < 0 ? badge('退去前','muted') : d >= 60 ? badge(`${d}日`,'warn') : `${d}日`; };
   const listingBody = el('listing-body');
   const renderListings = () => {
-    const area = el('area-filter').value, status = el('status-filter').value, cond = el('cond-filter').value, kind = el('kind-filter').value, query = norm(el('search').value);
-    const rows = data.vacancies.filter(row => (area==='all'||row.a===area||(area==='other'&&!areas.includes(row.a))) && (status==='all'||(['①②','③④'].includes(status)?status.includes(category(row)):category(row)===status)) && (cond==='all'||condOf(row)===cond) && (kind==='all'||kindOf(row)===kind||(kind==='__general'&&group(row)==='general')) && (!query||norm(`${row.p} ${row.r}`).includes(query)));
+    const area = el('area-filter').value, status = el('status-filter').value, cond = el('cond-filter').value, kind = el('kind-filter').value, period = el('period-filter').value, query = norm(el('search').value);
+    const rows = data.vacancies.filter(row => (area==='all'||row.a===area||(area==='other'&&!areas.includes(row.a))) && (status==='all'||(['①②','③④'].includes(status)?status.includes(category(row)):category(row)===status)) && (cond==='all'||condOf(row)===cond) && (kind==='all'||kindOf(row)===kind||(kind==='__general'&&group(row)==='general')) && periodOk(row, period) && (!query||norm(`${row.p} ${row.r}`).includes(query)));
     el('listing-count').textContent = `${fmt(rows.length)}件 / 全${fmt(data.vacancies.length)}件`;
-    listingBody.innerHTML = rows.length ? rows.map(row => `<tr><td><a class="room-link" href="${roomUrl(row.id)}">${esc(row.p||'物件名なし')} ${esc(row.r||'号室なし')}</a></td><td>${esc(row.a||'地区なし')}</td><td>${esc(row.m||'種別なし')}</td><td>${category(row)==='other'?badge('要確認','warn'):badge(category(row),category(row)==='①'?'good':'muted')}</td><td>${esc(row.c||'空欄')}</td><td><a href="${taskUrl(row.id)}" target="_blank" rel="noopener noreferrer">開く ↗</a></td></tr>`).join('') : '<tr><td colspan="6" class="empty">該当する物件はありません</td></tr>';
+    listingBody.innerHTML = rows.length ? rows.map(row => `<tr><td><a class="room-link" href="${roomUrl(row.id)}">${esc(row.p||'物件名なし')} ${esc(row.r||'号室なし')}</a></td><td>${esc(row.a||'地区なし')}</td><td>${esc(row.m||'種別なし')}</td><td>${category(row)==='other'?badge('要確認','warn'):badge(category(row),category(row)==='①'?'good':'muted')}</td><td>${esc(condOf(row))}</td><td class="num">${listDays(row)}</td><td><a href="${taskUrl(row.id)}" target="_blank" rel="noopener noreferrer">開く ↗</a></td></tr>`).join('') : '<tr><td colspan="7" class="empty">該当する物件はありません</td></tr>';
   };
-  ['area-filter','status-filter','cond-filter','kind-filter','search'].forEach(id => el(id).addEventListener(id==='search'?'input':'change', renderListings));
-  el('filter-clear').addEventListener('click', () => { ['area-filter','status-filter','cond-filter','kind-filter'].forEach(id => { el(id).value = 'all'; }); el('search').value = ''; renderListings(); });
+  ['area-filter','status-filter','cond-filter','kind-filter','period-filter','search'].forEach(id => el(id).addEventListener(id==='search'?'input':'change', renderListings));
+  el('filter-clear').addEventListener('click', () => { ['area-filter','status-filter','cond-filter','kind-filter','period-filter'].forEach(id => { el(id).value = 'all'; }); el('search').value = ''; renderListings(); });
   renderListings();
 
   el('completed-count').textContent = `${recentRestorations.length}件`;
@@ -172,8 +178,6 @@
   }).join('') : '<tr><td colspan="5" class="empty">直近1週間に完了したタスクはありません</td></tr>';
 
   // 空室日数＝今日−解約日。長い順（解約日不明は最後）
-  const dayNum = d => Date.UTC(...d.split('-').map((v,i)=>i===1?Number(v)-1:Number(v)));
-  const vacancyDays = row => row.v ? Math.floor((dayNum(todayJst) - dayNum(row.v)) / 86400000) : null;
   window.DASH = {data, vacancyDays, todayJst, roomUrl, esc, norm, badge, fmt};
   const patrolRows = data.vacancies.filter(row => row.s==='空室中' && row.p && row.r)
     .sort((a,b) => (vacancyDays(b) ?? -1e9) - (vacancyDays(a) ?? -1e9) || `${a.a}${a.p}${a.r}`.localeCompare(`${b.a}${b.p}${b.r}`,'ja'));

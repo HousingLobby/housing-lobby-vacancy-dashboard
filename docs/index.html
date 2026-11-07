@@ -18,7 +18,7 @@
   <script defer src="nav.js?v=20261101"></script>
   <script defer src="outbox.js?v=20261008auth"></script>
   <script defer src="outbox-bar.js?v=20261008auth"></script>
-  <script defer src="app.js?v=20261107nokuran"></script>
+  <script defer src="app.js?v=20261107period"></script>
   <script defer src="monthend.js?v=20261101m"></script>
   <script defer src="promotion-goals.js?v=20261107total"></script>
   <script defer src="promotion.js?v=20261107total"></script>
@@ -71,8 +71,8 @@
       </section>
 
       <section class="panel" id="listing-panel"><div class="panel-heading"><h2>物件一覧</h2><span id="listing-count"></span></div>
-        <div class="filters"><label>エリア<select id="area-filter"><option value="all">全エリア</option><option>長崎中央</option><option>長崎北</option><option>諫早</option><option>大村</option><option value="other">その他（4エリア以外）</option></select></label><label>区分<select id="status-filter"><option value="all">すべて</option><option value="①">① 原復済</option><option value="②">② 原復未</option><option value="③">③ 退去予定</option><option value="④">④ 募集止め</option><option value="①②">空室（①＋②）</option><option value="③④">退去予定・募集止め（③＋④）</option><option value="other">要確認</option></select></label><label>空室状況<select id="cond-filter"><option value="all">すべて</option></select></label><label>管理種別<select id="kind-filter"><option value="all">すべて</option></select></label><label class="search-field">物件名・号室<input id="search" type="search" placeholder="物件名や号室で検索"></label><label>&nbsp;<button type="button" class="secondary-button" id="filter-clear">絞り込みを解除</button></label></div>
-        <div class="table-scroll"><table class="list-table"><thead><tr><th>物件・号室</th><th>エリア</th><th>管理種別</th><th>区分</th><th>空室状況</th><th>Asana</th></tr></thead><tbody id="listing-body"></tbody></table></div></section>
+        <div class="filters"><label>エリア<select id="area-filter"><option value="all">全エリア</option><option>長崎中央</option><option>長崎北</option><option>諫早</option><option>大村</option><option value="other">その他（4エリア以外）</option></select></label><label>区分<select id="status-filter"><option value="all">すべて</option><option value="①">① 原復済</option><option value="②">② 原復未</option><option value="③">③ 退去予定</option><option value="④">④ 募集止め</option><option value="①②">空室（①＋②）</option><option value="③④">退去予定・募集止め（③＋④）</option><option value="other">要確認</option></select></label><label>空室状況<select id="cond-filter"><option value="all">すべて</option></select></label><label>管理種別<select id="kind-filter"><option value="all">すべて</option></select></label><label>空室期間<select id="period-filter"><option value="all">すべて</option><option value="in3">3ヶ月以内</option><option value="over3">3ヶ月以上</option><option value="over6">6ヶ月以上</option><option value="over12">1年以上</option></select></label><label class="search-field">物件名・号室<input id="search" type="search" placeholder="物件名や号室で検索"></label><label>&nbsp;<button type="button" class="secondary-button" id="filter-clear">絞り込みを解除</button></label></div>
+        <div class="table-scroll"><table class="list-table"><thead><tr><th>物件・号室</th><th>エリア</th><th>管理種別</th><th>区分</th><th>空室状況</th><th class="num">空室日数</th><th>Asana</th></tr></thead><tbody id="listing-body"></tbody></table></div></section>
       <p class="footnote">空室一覧「募集中」セクションの未完了タスク。集計対象は4エリアの一般管理・セキスイ物件・サブ。地区や管理種別が対象外のタスクは入居率に加えていません。</p>
     </section>
 
