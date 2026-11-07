@@ -8,20 +8,20 @@
   <title>リーシング業務ダッシュボード</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%23102841'/%3E%3Cpath d='M12 31 32 14l20 17v21H12z' fill='none' stroke='%23f4bb61' stroke-width='5' stroke-linejoin='round'/%3E%3Cpath d='M26 52V36h12v16' fill='none' stroke='%23f4bb61' stroke-width='5'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css?v=20261107noframe">
-  <link rel="stylesheet" href="promotion-goals.css?v=20261102visual">
+  <link rel="stylesheet" href="promotion-goals.css?v=20261107split">
   <script defer src="vendor/msal-browser-2.38.3.min.js"></script>
   <script defer src="config.js?v=20261008gas2"></script>
   <script defer src="auth.js?v=20261011e"></script>
   <script defer src="snapshot-current.js?v=20261008auth"></script>
   <script defer src="patrol-store.js?v=20261002"></script>
-  <script defer src="api.js?v=20261102goalsonly"></script>
+  <script defer src="api.js?v=20261107split"></script>
   <script defer src="nav.js?v=20261101"></script>
   <script defer src="outbox.js?v=20261008auth"></script>
   <script defer src="outbox-bar.js?v=20261008auth"></script>
   <script defer src="app.js?v=20261107breakdown"></script>
   <script defer src="monthend.js?v=20261101m"></script>
-  <script defer src="promotion-goals.js?v=20261102visual"></script>
-  <script defer src="promotion.js?v=20261102annual"></script>
+  <script defer src="promotion-goals.js?v=20261107split"></script>
+  <script defer src="promotion.js?v=20261107split"></script>
   <script defer src="suumo.js?v=20261030"></script>
   <script defer src="promotion-report.js?v=20261016"></script>
 </head>
@@ -105,7 +105,7 @@
           <form id="goals-form">
             <div class="goals-yearbar"><label for="goals-year">対象年<select id="goals-year"></select></label><p id="goals-editor-month" class="goals-editor-month">1月〜12月の申込数目標</p><span id="goals-year-total"></span></div>
             <div class="goals-inputs" id="goals-annual-inputs"></div>
-            <p class="goals-hint">申込数（成約数と同義）の目標を年単位でまとめて保存します。空欄＝未設定、0＝目標0件。未設定・目標0件では達成率を計算しません。</p>
+            <p class="goals-hint">サブ・一般（一般管理＋セキスイ物件）の申込目標を12か月まとめて保存します。旧合計目標は参考として残し、自動で振り分けません。空欄＝未設定、0＝目標0件。未設定・目標0件では達成率を計算しません。</p>
             <div class="goals-actions"><button type="submit" class="primary-button" id="goals-save" disabled>12か月の目標を一括保存</button><button type="button" class="secondary-button" id="goals-reload">保存値を再読込</button><span class="goals-hint">社内ログインで保存できます。</span></div>
             <p id="goals-message" class="goals-message" role="status"></p>
           </form>

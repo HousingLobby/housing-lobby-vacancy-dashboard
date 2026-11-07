@@ -74,6 +74,8 @@
     status: () => request({action: 'status'}),
     promotionGoals: month => request({action: 'promotionGoals', month}),
     annualPromotionGoals: year => request({action: 'annualPromotionGoals', year}),
+    splitAnnualPromotionGoals: year => request({action: 'splitAnnualPromotionGoals', year}),
+    setSplitAnnualPromotionGoals: body => request(null, {action: 'setSplitAnnualPromotionGoals', ...body}),
     setAnnualPromotionGoals: body => request(null, {action: 'setAnnualPromotionGoals', ...body}),
     setPromotionGoals: body => request(null, {action: 'setPromotionGoals', ...body}),
     promotion: (month, refresh) => {

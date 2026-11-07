@@ -150,6 +150,8 @@ function handle_(action, body) {
     case 'setPromotionGoals': return setPromotionGoals_(body);
     case 'annualPromotionGoals': return getAnnualPromotionGoals_(body.year);
     case 'setAnnualPromotionGoals': return setAnnualPromotionGoals_(body);
+    case 'splitAnnualPromotionGoals': return getSplitAnnualPromotionGoals_(body.year);
+    case 'setSplitAnnualPromotionGoals': return setSplitAnnualPromotionGoals_(body);
     case 'lpStatus': return lpStatus_(body.task);
     case 'status': return statusInfo_();
     case 'reportData': return reportData_(body);
@@ -886,6 +888,55 @@ function setAnnualPromotionGoals_(body) {
     persistPut_('YG' + year, JSON.stringify({revision: prior.revision + 1, targets: targets,
       updatedAt: at, updatedBy: by, requestId: body.requestId, signature: signature, history: history}));
     return getAnnualPromotionGoals_(year);
+  } finally { lock.releaseLock(); }
+}
+
+// サブ・一般の目標は別キーで保存。旧合計目標を自動配分・上書きしない。
+function getSplitAnnualPromotionGoals_(year) {
+  if (!CURRENT_USER) throw new Error(AUTH_ERROR);
+  year = goalYear_(year);
+  const raw = persistGet_('YG2' + year);
+  const r = raw ? JSON.parse(raw) : {revision: 0, targets: {}};
+  const targets = {};
+  for (let i = 1; i <= 12; i++) {
+    const m = year + '-' + ('0' + i).slice(-2);
+    targets[m] = r.targets[m] || {sub: null, general: null};
+  }
+  return {year: year, schema: 2, revision: r.revision, targets: targets,
+    legacyTotals: readAnnualPromotionGoals_(year).targets,
+    updatedAt: r.updatedAt || null, updatedBy: r.updatedBy || null};
+}
+
+function setSplitAnnualPromotionGoals_(body) {
+  if (!CURRENT_USER) throw new Error(AUTH_ERROR);
+  const year = goalYear_(body.year), targets = {};
+  if (!body.targets || Array.isArray(body.targets) || Object.keys(body.targets).length !== 12) throw new Error('12か月分を指定してください');
+  for (let i = 1; i <= 12; i++) {
+    const m = year + '-' + ('0' + i).slice(-2), values = body.targets[m];
+    if (!values || Array.isArray(values) || Object.keys(values).sort().join(',') !== 'general,sub') throw new Error('サブ・一般の目標を指定してください');
+    targets[m] = {};
+    ['sub', 'general'].forEach(k => {
+      const v = values[k];
+      if (v === null || v === '') targets[m][k] = null;
+      else if (typeof v === 'number' && isFinite(v) && v >= 0 && v <= 1000000 && v % 1 === 0) targets[m][k] = v;
+      else throw new Error('目標は0〜1,000,000の整数で入力してください');
+    });
+  }
+  if (!/^[A-Za-z0-9-]{8,100}$/.test(body.requestId || '')) throw new Error('保存IDが正しくありません');
+  const signature = JSON.stringify([year, body.revision, targets]);
+  const lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try {
+    const raw = persistGet_('YG2' + year), prior = raw ? JSON.parse(raw) : {revision: 0, targets: {}, history: []};
+    if (prior.requestId === body.requestId) {
+      if (prior.signature !== signature) throw new Error('保存IDが重複しています');
+      return getSplitAnnualPromotionGoals_(year);
+    }
+    if (body.revision !== prior.revision) throw new Error('別の端末で目標が変更されました。再読込してください');
+    const at = new Date().toISOString(), by = String(CURRENT_USER.name || '社内利用者').slice(0, 100);
+    const history = (prior.history || []).concat([{at: at, by: by, before: prior.targets, after: targets}]).slice(-20);
+    persistPut_('YG2' + year, JSON.stringify({schema: 2, revision: prior.revision + 1, targets: targets,
+      updatedAt: at, updatedBy: by, requestId: body.requestId, signature: signature, history: history}));
+    return getSplitAnnualPromotionGoals_(year);
   } finally { lock.releaseLock(); }
 }
 
