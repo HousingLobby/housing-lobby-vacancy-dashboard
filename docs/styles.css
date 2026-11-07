@@ -99,3 +99,10 @@ body.auth-wait main,body.auth-wait .outbox-bar{visibility:hidden}
 #summary-table tr.total-row td{background:#fff3c4;border-top:2px solid #e8c25a;font-size:1rem}
 #summary-table tr.total-row td.col-sum,#summary-table tr.total-row td:nth-last-child(-n+2){background:#ffe58f}
 .bd-view{margin:0 0 10px}
+
+/* 物件一覧の並び替え見出し 2026-11-07 */
+#listing-head th[data-sort]{cursor:pointer;user-select:none;white-space:nowrap}
+#listing-head th[data-sort]:hover{text-decoration:underline}
+#listing-head th[data-sort]::after{content:" ↕";opacity:.35;font-size:.85em}
+#listing-head th[aria-sort="ascending"]::after{content:" ▲";opacity:1}
+#listing-head th[aria-sort="descending"]::after{content:" ▼";opacity:1}

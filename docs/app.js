@@ -157,12 +157,32 @@
   const monthsAgo = n => { const [y,m,d] = todayJst.split('-').map(Number); const t = new Date(Date.UTC(y, m-1-n, 1)); const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth()+1, 0)).getUTCDate(); return `${t.getUTCFullYear()}-${String(t.getUTCMonth()+1).padStart(2,'0')}-${String(Math.min(d,last)).padStart(2,'0')}`; };
   const periodOk = (row, p) => { if (p === 'all') return true; if (!row.v || row.v > todayJst) return false; const [lo, hi] = {in3:[0,3], m3to6:[3,6], m6to12:[6,12], over12:[12,null]}[p]; return row.v <= monthsAgo(lo) && (hi === null || row.v > monthsAgo(hi)); };
   const listDays = row => { const d = vacancyDays(row); return d === null ? '<span class="check-unknown">—</span>' : d < 0 ? badge('退去前','muted') : d >= 60 ? badge(`${d}日`,'warn') : `${d}日`; };
+  // 見出しクリックで並び替え（同じ見出しをもう一度押すと逆順、3回目で元の順）。空室日数の空欄（解約日なし）は常に最後 2026-11-07
+  let listSort = {key: null, dir: 1};
+  const jaCmp = (a, b) => String(a||'').localeCompare(String(b||''), 'ja', {numeric: true});
+  const sortVal = {name: r => `${r.p||''} ${r.r||''}`, area: r => { const i = areas.indexOf(r.a); return String(i < 0 ? 9 : i) + (r.a||''); }, kind: kindOf, cat: r => category(r), cond: condOf, days: vacancyDays};
+  const sortRows = rows => {
+    if (!listSort.key) return rows;
+    const f = sortVal[listSort.key], d = listSort.dir;
+    return rows.map((r, i) => [r, i]).sort(([a, i], [b, j]) => {
+      const x = f(a), y = f(b);
+      if (listSort.key === 'days') { if (x === null && y === null) return i - j; if (x === null) return 1; if (y === null) return -1; return (x - y) * d || i - j; }
+      return jaCmp(x, y) * d || i - j;
+    }).map(([r]) => r);
+  };
+  el('listing-head').addEventListener('click', e => {
+    const th = e.target.closest('th[data-sort]'); if (!th) return;
+    const k = th.dataset.sort;
+    listSort = listSort.key !== k ? {key: k, dir: k === 'days' ? -1 : 1} : listSort.dir === (k === 'days' ? -1 : 1) ? {key: k, dir: -listSort.dir} : {key: null, dir: 1};
+    el('listing-head').querySelectorAll('th[data-sort]').forEach(h => { const on = h.dataset.sort === listSort.key; h.setAttribute('aria-sort', on ? (listSort.dir > 0 ? 'ascending' : 'descending') : 'none'); });
+    renderListings();
+  });
   const listingBody = el('listing-body');
   const renderListings = () => {
     const area = el('area-filter').value, status = el('status-filter').value, cond = el('cond-filter').value, kind = el('kind-filter').value, period = el('period-filter').value, query = norm(el('search').value);
     const rows = data.vacancies.filter(row => (area==='all'||row.a===area||(area==='other'&&!areas.includes(row.a))) && (status==='all'||(['①②','③④'].includes(status)?status.includes(category(row)):category(row)===status)) && (cond==='all'||condOf(row)===cond) && (kind==='all'||kindOf(row)===kind||(kind==='__general'&&group(row)==='general')) && periodOk(row, period) && (!query||norm(`${row.p} ${row.r}`).includes(query)));
     el('listing-count').textContent = `${fmt(rows.length)}件 / 全${fmt(data.vacancies.length)}件`;
-    listingBody.innerHTML = rows.length ? rows.map(row => `<tr><td><a class="room-link" href="${roomUrl(row.id)}">${esc(row.p||'物件名なし')} ${esc(row.r||'号室なし')}</a></td><td>${esc(row.a||'地区なし')}</td><td>${esc(row.m||'種別なし')}</td><td>${category(row)==='other'?badge('要確認','warn'):badge(category(row),category(row)==='①'?'good':'muted')}</td><td>${esc(condOf(row))}</td><td class="num">${listDays(row)}</td><td><a href="${taskUrl(row.id)}" target="_blank" rel="noopener noreferrer">開く ↗</a></td></tr>`).join('') : '<tr><td colspan="7" class="empty">該当する物件はありません</td></tr>';
+    listingBody.innerHTML = rows.length ? sortRows(rows).map(row => `<tr><td><a class="room-link" href="${roomUrl(row.id)}">${esc(row.p||'物件名なし')} ${esc(row.r||'号室なし')}</a></td><td>${esc(row.a||'地区なし')}</td><td>${esc(row.m||'種別なし')}</td><td>${category(row)==='other'?badge('要確認','warn'):badge(category(row),category(row)==='①'?'good':'muted')}</td><td>${esc(condOf(row))}</td><td class="num">${listDays(row)}</td><td><a href="${taskUrl(row.id)}" target="_blank" rel="noopener noreferrer">開く ↗</a></td></tr>`).join('') : '<tr><td colspan="7" class="empty">該当する物件はありません</td></tr>';
   };
   ['area-filter','status-filter','cond-filter','kind-filter','period-filter','search'].forEach(id => el(id).addEventListener(id==='search'?'input':'change', renderListings));
   el('filter-clear').addEventListener('click', () => { ['area-filter','status-filter','cond-filter','kind-filter','period-filter'].forEach(id => { el(id).value = 'all'; }); el('search').value = ''; renderListings(); });
