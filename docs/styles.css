@@ -77,3 +77,10 @@ body.auth-wait main,body.auth-wait .outbox-bar{visibility:hidden}
 .cnt-zero{color:#a3b2bc}
 .area-total-row td{background:#f7fafb}
 #listing-panel .filters{margin-bottom:12px}
+
+/* 内訳表の列・行の切り替え（2026-11-07） */
+#summary-table.hide-detail .col-detail{display:none}
+#summary-table.hide-sub .sub-row{display:none}
+#summary-table th small{font-size:.8rem;font-weight:700;color:#6a7f8e}
+#summary-table .col-sum{background:#f3f8fb}
+.bd-view{margin:0 0 10px}

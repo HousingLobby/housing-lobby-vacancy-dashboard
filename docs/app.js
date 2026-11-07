@@ -94,19 +94,23 @@
   ].map(([label,n]) => `<div class="exception-row"><span>${esc(label)}</span><strong>${fmt(n)}件</strong></div>`).join('');
   // 内訳の件数ボタン：押すと物件一覧をその条件で絞り込む
   const pick = (n, f) => n ? `<button type="button" class="cnt" data-f='${esc(JSON.stringify(f))}'>${fmt(n)}</button>` : '<span class="cnt-zero">0</span>';
+  // ①②→空室（①＋②）、③④→退去予定・募集止め（③＋④）。①〜④の列は「内訳も表示」のときだけ見える（2026-11-07）
+  const bdCells = (c, f) => [['①','②'],['③','④']].map(([x, y]) =>
+    [x, y].map(t => `<td class="num col-detail">${pick(c[t], {...f, s: t})}</td>`).join('') +
+    `<td class="num col-sum"><strong>${pick(c[x] + c[y], {...f, s: x + y})}</strong></td>`).join('');
   const summaryRows = [];
   for (const area of areas) {
     const sum = emptyCounts();
     for (const key of keys) {
       const c = counts[`${area}|${key}`], r = R?.groups?.[`${area}|${key}`];
       for (const t of Object.keys(sum)) sum[t] += c[t];
-      summaryRows.push(`<tr><td><strong>${area}</strong>　${key==='sub'?'サブ':'一般'}</td>${['①','②','③','④'].map(t => `<td class="num">${pick(c[t], {a: area, s: t, m: key === 'sub' ? 'サブ' : '__general'})}</td>`).join('')}<td class="num">${c['⑤']}</td><td class="num"><strong>${occupancy(r)}</strong></td><td class="num">${evaluated(r)}</td></tr>`);
+      summaryRows.push(`<tr class="sub-row"><td><strong>${area}</strong>　${key==='sub'?'サブ':'一般'}</td>${bdCells(c, {a: area, m: key === 'sub' ? 'サブ' : '__general'})}<td class="num">${c['⑤']}</td><td class="num"><strong>${occupancy(r)}</strong></td><td class="num">${evaluated(r)}</td></tr>`);
     }
     // エリア合計（サブ・一般の合算）。率はGASがエリアの管理戸数合計で計算した値
     const ra = R?.areas?.[area];
-    summaryRows.push(`<tr class="area-total-row"><td><strong>${area}　合計</strong></td>${['①','②','③','④'].map(t => `<td class="num">${pick(sum[t], {a: area, s: t})}</td>`).join('')}<td class="num">${sum['⑤']}</td><td class="num"><strong>${occupancy(ra)}</strong></td><td class="num"><strong>${evaluated(ra)}</strong></td></tr>`);
+    summaryRows.push(`<tr class="area-total-row"><td><strong>${area}　合計</strong></td>${bdCells(sum, {a: area})}<td class="num">${sum['⑤']}</td><td class="num"><strong>${occupancy(ra)}</strong></td><td class="num"><strong>${evaluated(ra)}</strong></td></tr>`);
   }
-  summaryRows.push(`<tr class="total-row"><td>全体</td>${['①','②','③','④'].map(t => `<td class="num">${pick(total[t], {s: t})}</td>`).join('')}<td class="num">${total['⑤']}</td><td class="num">${occupancy(R?.total)}</td><td class="num">${evaluated(R?.total)}</td></tr>`);
+  summaryRows.push(`<tr class="total-row"><td>全体</td>${bdCells(total, {})}<td class="num">${total['⑤']}</td><td class="num">${occupancy(R?.total)}</td><td class="num">${evaluated(R?.total)}</td></tr>`);
   document.querySelector('#summary-table tbody').innerHTML = summaryRows.join('');
 
   // 空室状況・管理種別ごとの内訳（【募集中】の全タスク。4エリア以外は「その他」）
@@ -123,6 +127,16 @@
   const kindValues = crossTable('kind-table', '管理種別', kindOf, 'm');
   el('cond-filter').insertAdjacentHTML('beforeend', condValues.map(v => `<option>${esc(v)}</option>`).join(''));
   el('kind-filter').insertAdjacentHTML('beforeend', '<option value="__general">一般（一般管理・セキスイ）</option>' + kindValues.map(v => `<option>${esc(v)}</option>`).join(''));
+  // 内訳表の見た目（列・行）。選んだ表示はこのブラウザに保存する
+  const bdTable = el('summary-table');
+  const applyBdView = () => {
+    bdTable.classList.toggle('hide-detail', el('bd-cols').value !== 'detail');
+    bdTable.classList.toggle('hide-sub', el('bd-rows').value !== 'sub');
+    try { localStorage.setItem('bdView', JSON.stringify({cols: el('bd-cols').value, rows: el('bd-rows').value})); } catch (e) {}
+  };
+  try { const v = JSON.parse(localStorage.getItem('bdView') || '{}'); if (v.cols) el('bd-cols').value = v.cols; if (v.rows) el('bd-rows').value = v.rows; } catch (e) {}
+  ['bd-cols', 'bd-rows'].forEach(id => el(id).addEventListener('change', applyBdView));
+  applyBdView();
   document.querySelectorAll('[data-bd]').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('[data-bd]').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-selected', on); });
     document.querySelectorAll('[data-bd-panel]').forEach(p => { p.hidden = p.dataset.bdPanel !== b.dataset.bd; });
@@ -138,7 +152,7 @@
   const listingBody = el('listing-body');
   const renderListings = () => {
     const area = el('area-filter').value, status = el('status-filter').value, cond = el('cond-filter').value, kind = el('kind-filter').value, query = norm(el('search').value);
-    const rows = data.vacancies.filter(row => (area==='all'||row.a===area||(area==='other'&&!areas.includes(row.a))) && (status==='all'||category(row)===status) && (cond==='all'||condOf(row)===cond) && (kind==='all'||kindOf(row)===kind||(kind==='__general'&&group(row)==='general')) && (!query||norm(`${row.p} ${row.r}`).includes(query)));
+    const rows = data.vacancies.filter(row => (area==='all'||row.a===area||(area==='other'&&!areas.includes(row.a))) && (status==='all'||(['①②','③④'].includes(status)?status.includes(category(row)):category(row)===status)) && (cond==='all'||condOf(row)===cond) && (kind==='all'||kindOf(row)===kind||(kind==='__general'&&group(row)==='general')) && (!query||norm(`${row.p} ${row.r}`).includes(query)));
     el('listing-count').textContent = `${fmt(rows.length)}件 / 全${fmt(data.vacancies.length)}件`;
     listingBody.innerHTML = rows.length ? rows.map(row => `<tr><td><a class="room-link" href="${roomUrl(row.id)}">${esc(row.p||'物件名なし')} ${esc(row.r||'号室なし')}</a></td><td>${esc(row.a||'地区なし')}</td><td>${esc(row.m||'種別なし')}</td><td>${category(row)==='other'?badge('要確認','warn'):badge(category(row),category(row)==='①'?'good':'muted')}</td><td>${esc(row.c||'空欄')}</td><td><a href="${taskUrl(row.id)}" target="_blank" rel="noopener noreferrer">開く ↗</a></td></tr>`).join('') : '<tr><td colspan="6" class="empty">該当する物件はありません</td></tr>';
   };
