@@ -155,7 +155,7 @@
   const vacancyDays = row => row.v ? Math.floor((dayNum(todayJst) - dayNum(row.v)) / 86400000) : null;
   // 空室期間の絞り込み（解約日からの暦月。退去前・解約日不明は対象外）2026-11-07
   const monthsAgo = n => { const [y,m,d] = todayJst.split('-').map(Number); const t = new Date(Date.UTC(y, m-1-n, 1)); const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth()+1, 0)).getUTCDate(); return `${t.getUTCFullYear()}-${String(t.getUTCMonth()+1).padStart(2,'0')}-${String(Math.min(d,last)).padStart(2,'0')}`; };
-  const periodOk = (row, p) => { if (p === 'all') return true; if (!row.v || row.v > todayJst) return false; return p === 'in3' ? row.v > monthsAgo(3) : row.v <= monthsAgo(p === 'over3' ? 3 : p === 'over6' ? 6 : 12); };
+  const periodOk = (row, p) => { if (p === 'all') return true; if (!row.v || row.v > todayJst) return false; const [lo, hi] = {in3:[0,3], m3to6:[3,6], m6to12:[6,12], over12:[12,null]}[p]; return row.v <= monthsAgo(lo) && (hi === null || row.v > monthsAgo(hi)); };
   const listDays = row => { const d = vacancyDays(row); return d === null ? '<span class="check-unknown">—</span>' : d < 0 ? badge('退去前','muted') : d >= 60 ? badge(`${d}日`,'warn') : `${d}日`; };
   const listingBody = el('listing-body');
   const renderListings = () => {
