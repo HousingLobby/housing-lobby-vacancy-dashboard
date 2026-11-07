@@ -90,4 +90,19 @@
   .goals-actions>.goals-hint { flex-basis:100%; }
 }
 @media(prefers-reduced-motion:reduce) { .goal-track>span { transition:none; } }
+.goals-cards { display:block!important; }
+.goals-cards .goal-summary { padding:8px 0 0; }
+.goals-cards .goal-summary h3 { font-size:1rem; color:#193c55; }
+.goals-cards .goal-summary .goal-metric dd { font-size:clamp(2.7rem,4.5vw,4rem); }
+.goals-cards .goal-summary .goal-metric dt { font-size:.92rem; }
+.goals-total-note { margin:16px 0 0; color:#61798a; font-size:.78rem; line-height:1.8; }
+.goals-breakdown { margin-top:24px; padding:24px; border:1px solid #dce5ec; border-radius:10px; background:#fbfdfe; }
+.goals-breakdown-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:22px; }
+.goals-breakdown-heading h3 { margin:0; color:#294b60; font-size:.95rem; }
+.goals-breakdown-heading>span { font-size:.75rem; color:#61798a; }
+.goals-breakdown-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:28px; }
+#promo-kpis { grid-template-columns:repeat(4,minmax(0,1fr))!important; }
+@media(max-width:1100px) { .goals-breakdown-grid { grid-template-columns:1fr; } }
+@media(max-width:760px) { #promo-kpis { grid-template-columns:repeat(2,minmax(0,1fr))!important; } .goals-breakdown { padding:20px; } }
+@media(max-width:520px) { .goals-breakdown { padding:18px 14px; } .goals-cards .goal-summary .goal-metric dd { font-size:2.6rem; } }
 .goals-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}.goals-cards .goal-card+.goal-card{border-left:1px solid #dce5ec;padding-left:28px}.goals-cards .goal-metric{padding:4px 14px}.goals-cards .goal-metric:first-child{padding-left:0}.goals-cards .goal-metric dd{font-size:clamp(1.8rem,2.5vw,2.8rem)}.goals-cards .goal-achievement{padding:16px 14px!important}.goals-cards .goal-metric dt{font-size:.8rem}.goals-month-input{min-width:0;margin:0;border:1px solid #dce5ec;border-radius:8px;padding:12px}.goals-month-input legend{padding:0 6px;font-weight:700;font-size:.9rem;color:#294b60}.goals-month-input label+label{margin-top:10px}.legacy-total{display:block;margin-top:10px;font-size:.7rem;color:#61798a}.goals-month-input.is-current{border-color:#168b89}.goals-month-input .goals-input-wrap{gap:5px}.goals-inputs{grid-template-columns:repeat(4,minmax(0,1fr))}#promo-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}@media(max-width:1100px){.goals-cards{grid-template-columns:1fr}.goals-cards .goal-card+.goal-card{border-left:0;border-top:1px solid #dce5ec;padding-left:0;padding-top:24px}#promo-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.goals-inputs{grid-template-columns:repeat(3,minmax(0,1fr))}#promo-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.goals-inputs{grid-template-columns:repeat(2,minmax(0,1fr))}.goals-cards .goal-metric dd{font-size:2.2rem}.goals-cards .goal-achievement{padding:17px 18px!important}}

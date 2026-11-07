@@ -62,14 +62,12 @@
     if (select.value !== month) return; // 途中で月を切り替えた
     const a = d.application, r = d.response;
     const split = window.PromotionGoalMath.splitApplications(a);
-    const splitFmt = n => Number.isFinite(n) ? fmt(n) : '—';
-    if (window.PromotionGoals) window.PromotionGoals.setActuals(month, split, d);
+    if (window.PromotionGoals) window.PromotionGoals.setActuals(month, {...split, total: a.total}, d);
     const applied = r.byResult?.['申込']?.people || 0;
     el('promo-asof').textContent = `集計 ${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(d.asOf))}`;
     el('promo-notice').textContent = `${monthLabel(month)}（${d.range.start}〜${d.range.end}）の集計です。${month === jst.slice(0,7) ? '当月は途中経過で、登録が進むと件数が変わります。' : ''}${r.excluded ? `登録エラーとみられる空タスク${r.excluded}件を除外しました。` : ''}`;
     el('promo-kpis').innerHTML = [
-      ['申込数（サブ）', `${splitFmt(split.sub)}件`, `全申込 ${fmt(a.total)}件${split.other ? ` ／ その他・未設定 ${fmt(split.other)}件` : ''}`, 'featured'],
-      ['申込数（一般）', `${splitFmt(split.general)}件`, '一般管理＋セキスイ物件', ''],
+      ['申込数（合計）', `${fmt(a.total)}件`, '【空室一覧】申込日ベース', 'featured'],
       ['反響（人数）', `${fmt(r.total.people)}人`, `物件ごと ${fmt(r.total.properties)}件`, ''],
       ['反響→申込', r.total.people ? `${(applied / r.total.people * 100).toFixed(1)}%` : '—', `内見結果「申込」${fmt(applied)}人`, ''],
       ['仲介同行', `${fmt(r.brokerVisits)}件`, '反響とは別集計', '']

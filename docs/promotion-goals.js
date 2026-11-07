@@ -15,7 +15,12 @@
     const general = (a.byKind['一般管理'] || 0) + (a.byKind['セキスイ物件'] || 0);
     return {sub, general, other: a.total - sub - general};
   };
-  window.PromotionGoalMath = {achievement, parseTarget, splitApplications};
+  const combinedTarget = (values, legacy) => {
+    if (Number.isFinite(values?.sub) && Number.isFinite(values?.general)) return {value: values.sub + values.general, legacy: false};
+    if (values?.sub == null && values?.general == null && Number.isFinite(legacy)) return {value: legacy, legacy: true};
+    return {value: null, legacy: false};
+  };
+  window.PromotionGoalMath = {achievement, parseTarget, splitApplications, combinedTarget};
   const $ = id => document.getElementById(id);
   if (!$('goals-form')) return;
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -53,15 +58,15 @@
   function draw() {
     const r = years.get(month.slice(0, 4));
     $('goals-month').textContent = month ? `${month.slice(0, 4)}年${Number(month.slice(5))}月` : '';
-    $('goals-cards').innerHTML = groups.map(([key,label]) => {
-    const target = r?.targets[month]?.[key], value = actual[key], pct = achievement(value, target);
+    const renderCard = (label, value, target, summary = false) => {
+    const pct = achievement(value, target);
     const actualCount = value;
     const status = !r ? '目標読込待ち' : target == null ? '目標未設定' : target === 0 ? '目標0・達成率対象外' : !Number.isFinite(actualCount) ? '実績読込待ち' : actualCount >= target ? '目標達成' : `あと${fmt(target - actualCount)}件`;
     $('goals-month').textContent = month ? `${month.slice(0, 4)}年${Number(month.slice(5))}月` : '';
     const remaining = Number.isFinite(actualCount) && Number.isFinite(target) && target > 0 ? Math.max(0, target - actualCount) : null;
     const achieved = pct !== null && pct >= 100;
-    return `<article class="goal-card${achieved ? ' is-achieved' : ''}">
-      <div class="goal-card-top"><h3>${label}の申込進捗</h3><span class="goal-status">${esc(achieved ? '✓ 目標達成' : status)}</span></div>
+    return `<article class="goal-card${summary ? ' goal-summary' : ''}${achieved ? ' is-achieved' : ''}">
+      <div class="goal-card-top"><h3>${label}</h3><span class="goal-status">${esc(achieved ? '✓ 目標達成' : status)}</span></div>
       <dl class="goal-metrics">
         <div class="goal-metric goal-actual"><dt>申込実績</dt><dd>${Number.isFinite(actualCount) ? fmt(actualCount) : '—'}<small>件</small></dd></div>
         <div class="goal-metric"><dt>月の目標</dt><dd>${target == null ? '—' : fmt(target)}<small>件</small></dd></div>
@@ -69,7 +74,14 @@
       </dl>
       <div class="goal-track" role="img" aria-label="${esc(pct === null ? status : '達成率' + pct.toFixed(1) + '%')}"><span style="width:${pct === null ? 0 : Math.min(100, Math.max(0, pct))}%"></span></div>
       <div class="goal-progress-caption"><span>${achieved ? actualCount === target ? '目標を達成しました' : `目標を${fmt(actualCount - target)}件上回っています` : remaining === null ? esc(status) : `目標まであと <strong>${fmt(remaining)}<small>件</small></strong>`}</span><span>実績 ÷ 目標 × 100</span></div>
-    </article>`; }).join('');
+    </article>`;
+    };
+    const combined = combinedTarget(r?.targets[month], r?.legacyTotals?.[month]);
+    const note = combined.legacy ? '合計目標は以前登録した値です。サブ・一般の両方を設定すると、その合計に切り替わります。' : '合計目標＝サブ＋一般。両方の目標を設定すると、合計の達成率を表示します。';
+    $('goals-cards').innerHTML = renderCard('全体の申込進捗', actual.total, combined.value, true)
+      + `<p class="goals-total-note">${esc(note)}</p><section class="goals-breakdown" aria-label="サブ・一般の内訳"><div class="goals-breakdown-heading"><h3>サブ・一般の内訳</h3><span>一般＝一般管理＋セキスイ物件</span></div><div class="goals-breakdown-grid">`
+      + groups.map(([key,label]) => renderCard(label, actual[key], r?.targets[month]?.[key])).join('')
+      + `</div>${actual.other ? `<p class="goals-total-note">その他・未設定 ${fmt(actual.other)}件は合計に含み、サブ・一般には含めていません。</p>` : ''}</section>`;
     $('goals-updated').textContent = (r?.updatedAt ? `目標更新 ${r.updatedAt.slice(0, 10)} · ${r.updatedBy || '社内利用者'}` : '年間一覧で入力した目標は、保存後に全員へ共有されます。') + (meta?.stale ? ' ／ 実績は前回取得分です。' : '');
   }
   const validate = (r, y) => {

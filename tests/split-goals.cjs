@@ -21,3 +21,10 @@ const ui=vm.createContext({window:{},document:{getElementById:()=>null}});vm.run
 const s=m.splitApplications({total:9,byKind:{'サブ':3,'一般管理':4,'セキスイ物件':1,'古里物件':1}});assert.equal(s.sub,3);assert.equal(s.general,5);assert.equal(s.other,1);
 assert.equal(m.splitApplications({total:9,byKind:{'サブ':3}}).sub,null);assert.equal(m.splitApplications({total:0,byKind:{}}).general,0);assert.equal(m.achievement(12,10),120);assert.equal(m.achievement(0,0),null);
 console.log('Split goals passed: 24 fields, legacy untouched, auth, validation, atomic save, retries, revisions, null/zero, classification and total reconciliation.');
+assert.equal(m.combinedTarget({sub:10,general:20},99).value,30);
+assert.equal(m.combinedTarget({sub:10,general:null},99).value,null);
+assert.equal(m.combinedTarget({sub:null,general:null},29).value,29);
+assert.equal(m.combinedTarget({sub:null,general:null},29).legacy,true);
+assert.equal(m.combinedTarget({sub:0,general:0},29).value,0);
+assert.equal(m.combinedTarget(undefined,undefined).value,null);
+console.log('Total-first goals passed: summed targets, partial targets, legacy reference and zero.');
