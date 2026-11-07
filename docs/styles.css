@@ -82,5 +82,14 @@ body.auth-wait main,body.auth-wait .outbox-bar{visibility:hidden}
 #summary-table.hide-detail .col-detail{display:none}
 #summary-table.hide-sub .sub-row{display:none}
 #summary-table th small{font-size:.8rem;font-weight:700;color:#6a7f8e}
-#summary-table .col-sum{background:#f3f8fb}
+/* 大事な数字を目立たせる（2026-11-07）：合計列＝青、入居率2列＝濃紺の太字、全体行＝黄 */
+#summary-table th.col-sum{background:#1b5d85;color:#fff}
+#summary-table th.col-sum small{color:#d6e7f2}
+#summary-table td.col-sum{background:#e3eff7}
+#summary-table td.col-sum .cnt{background:#1b5d85;color:#fff;font-size:1rem;padding:3px 12px}
+#summary-table td.col-sum .cnt:hover,#summary-table td.col-sum .cnt:focus-visible{background:#0f3f5e}
+#summary-table th:nth-last-child(-n+2){background:#163d5a;color:#fff}
+#summary-table td:nth-last-child(-n+2){color:#0f3f5e;font-size:1rem;font-weight:800;background:#f4f8fb}
+#summary-table tr.total-row td{background:#fff3c4;border-top:2px solid #e8c25a;font-size:1rem}
+#summary-table tr.total-row td.col-sum,#summary-table tr.total-row td:nth-last-child(-n+2){background:#ffe58f}
 .bd-view{margin:0 0 10px}
