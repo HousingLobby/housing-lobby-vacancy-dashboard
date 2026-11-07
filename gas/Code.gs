@@ -1622,7 +1622,8 @@ function rentMan_(v) {
 
 
 /* ---------- 物件紹介LP作成の依頼（ボタン→待ち行列→Claudeが作成→URLを書き戻す） ---------- */
-// 状態の正本＝物件タスク直下のサブタスク「物件紹介LP」の説明欄（プロパティには書かない）。待ち行列はスクリプトプロパティ LP_QUEUE。
+// 状態の正本＝GASのLP_STATE_<物件タスクID>。Asanaへの作成・更新は行わない。
+// 旧サブタスクは移行のため読み取りのみ。削除前にmigrateLegacyLpStatesで退避する。
 // スクリプトプロパティ LP_WORKER_KEY：作成側（Claude）が待ち行列を読み書きするための鍵（必須）
 
 const LP_TASK_NAME = '物件紹介LP';
@@ -1646,24 +1647,89 @@ function lpParse_(sub) {
 function lpQueueGet_() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('LP_QUEUE') || '[]'); } catch (_) { return []; } }
 function lpQueuePut_(q) { PropertiesService.getScriptProperties().setProperty('LP_QUEUE', JSON.stringify(q)); }
 
-function lpStatus_(task) { return lpParse_(lpFind_(task)); }
+function lpStateKey_(task) {
+  if (!/^\d+$/.test(String(task || ''))) throw new Error('物件IDが不正です');
+  return 'LP_STATE_' + task;
+}
+
+function lpStateGet_(task) {
+  const raw = PropertiesService.getScriptProperties().getProperty(lpStateKey_(task));
+  // 破損時は旧記録へ戻して二重依頼せず、エラーにする。
+  return raw ? JSON.parse(raw) : lpParse_(lpFind_(task));
+}
+
+function lpStatePut_(task, state) {
+  PropertiesService.getScriptProperties().setProperty(lpStateKey_(task), JSON.stringify(state));
+}
+
+function lpStatus_(task) { return lpStateGet_(task); }
+
+// 管理者がエディタから実行する既存LPの登録。Asanaは読み取りのみ。
+// 一致済みの物件・号室でも、実行時に申込済み／募集停止なら登録しない。
+function registerExistingLpLinks(items) {
+  if (!Array.isArray(items) || items.length > 100) throw new Error('登録対象が不正です');
+  const normalize = v => String(v || '').normalize('NFKC').replace(/[\s・･.．\-‐‑–—－_（）()]+/g, '').toLowerCase();
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    return items.map(it => {
+      lpStateKey_(it.task);
+      if (!/^https:\/\/housinglobby\.github\.io\/lp\/[a-z0-9-]+\/$/.test(String(it.url || ''))) throw new Error('LP URLが不正です');
+      const t = asanaGet_('/tasks/' + it.task, {opt_fields: 'completed,memberships.project.gid,memberships.section.gid,custom_fields.gid,custom_fields.display_value'});
+      assertInProject_(t);
+      const f = {}; (t.custom_fields || []).forEach(x => { f[x.gid] = x.display_value; });
+      if (normalize(f[CFG.fields.p]) !== normalize(it.property) || normalize(f[CFG.fields.r]) !== normalize(it.room)) throw new Error('物件・号室が変わっています: ' + it.task);
+      if (t.completed || !['空室中', '入居中（退去予定）'].includes(f[CFG.fields.s]) || /申込|契約|入居済|募集止/.test(String(f[CFG.fields.c] || '')) ||
+          !(t.memberships || []).some(m => m.project.gid === CFG.project && m.section && m.section.gid === CFG.section)) return {task: it.task, result: '対象外'};
+      const current = lpStateGet_(it.task);
+      if (current.state === '完了' && current.url && current.url !== it.url) return {task: it.task, result: '既存URLと異なるため保留'};
+      lpStatePut_(it.task, {state: '完了', url: it.url, updatedAt: new Date().toISOString(), source: '公開済みLP照合'});
+      const check = JSON.parse(PropertiesService.getScriptProperties().getProperty(lpStateKey_(it.task)));
+      if (check.url !== it.url) throw new Error('保存確認失敗: ' + it.task);
+      lpQueuePut_(lpQueueGet_().filter(q => q.task !== it.task));
+      return {task: it.task, result: '登録済み', url: check.url};
+    });
+  } finally { lock.releaseLock(); }
+}
+
+// GAS管理者が削除対象の親タスクIDを指定して実行する移行。Asanaは読み取りのみ。
+// 完了URLも依頼状態も保持し、既存のアプリ側記録は上書きしない。
+function migrateLegacyLpStates(taskIds) {
+  if (!Array.isArray(taskIds) || !taskIds.length) throw new Error('対象の親タスクIDを指定してください');
+  taskIds.forEach(lpStateKey_);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    return taskIds.map(task => {
+      const t = asanaGet_('/tasks/' + task, {opt_fields: 'memberships.project.gid'});
+      assertInProject_(t);
+      const state = lpStateGet_(task);
+      if (state.state !== 'none') lpStatePut_(task, state);
+      return {task: task, state: state.state, url: state.url || null};
+    });
+  } finally { lock.releaseLock(); }
+}
 
 function lpRequest_(body) {
   if (!passOk_('EDIT_PASSCODE', body.passcode)) throw new Error('合言葉が違います');
+  lpStateKey_(body.task);
   const task = asanaGet_('/tasks/' + encodeURIComponent(body.task), {opt_fields: 'name,memberships.project.gid,custom_fields.gid,custom_fields.display_value'});
   assertInProject_(task);
-  const cur = lpParse_(lpFind_(body.task));
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+  const cur = lpStateGet_(body.task);
   if (cur.state === '依頼中' || cur.state === '作成中' || cur.state === '完了') return cur;
   const f = {};
   (task.custom_fields || []).forEach(x => { f[x.gid] = x.display_value; });
   const prop = f[CFG.fields.p] || task.name || '', room = f[CFG.fields.r] || '';
-  let sub = cur.subtask ? {gid: cur.subtask} : null;
-  if (sub) asanaFetch_('put', '/tasks/' + sub.gid, null, {data: {notes: lpNotes_('依頼中')}});
-  else sub = asanaPost_('/tasks/' + encodeURIComponent(body.task) + '/subtasks', {data: {name: LP_TASK_NAME, notes: lpNotes_('依頼中')}});
+  const state = {state: '依頼中', updatedAt: new Date().toISOString()};
   const q = lpQueueGet_().filter(x => x.task !== body.task);
-  q.push({task: body.task, subtask: sub.gid, property: prop, room: room, at: new Date().toISOString()});
+  q.push({task: body.task, property: prop, room: room, at: state.updatedAt});
+  // 待ち行列を先に保存。途中失敗時の再送は同じtaskを置換し、依頼の消失を防ぐ。
   lpQueuePut_(q);
-  return {state: '依頼中', subtask: sub.gid};
+  lpStatePut_(body.task, state);
+  return state;
+  } finally { lock.releaseLock(); }
 }
 
 function lpWorkerOk_(key) {
@@ -1677,12 +1743,20 @@ function lpQueue_(key) { lpWorkerOk_(key); return {queue: lpQueueGet_()}; }
 function lpUpdate_(body) {
   lpWorkerOk_(body.key);
   if (['作成中', '完了', '失敗'].indexOf(body.state) < 0) throw new Error('状態が不正です');
+  lpStateKey_(body.task);
+  if (body.state === '完了' && !/^https:\/\/\S{1,1000}$/.test(String(body.url || ''))) throw new Error('完成したLPのHTTPS URLが必要です');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
   const item = lpQueueGet_().find(x => x.task === body.task);
-  const subtask = (item && item.subtask) || (lpFind_(body.task) || {}).gid;
-  if (!subtask) throw new Error('依頼が見つかりません');
-  asanaFetch_('put', '/tasks/' + subtask, null, {data: {notes: lpNotes_(body.state, {url: body.url, message: body.message}), completed: body.state === '完了'}});
+  const cur = lpStateGet_(body.task);
+  if (!item && cur.state === '完了') return {ok: true}; // 完了後の遅延通知で状態を戻さない
+  if (!item && cur.state !== '依頼中' && cur.state !== '作成中') throw new Error('依頼が見つかりません');
+  lpStatePut_(body.task, {state: body.state, url: body.state === '完了' ? body.url : null,
+    message: body.message ? String(body.message).slice(0, 1500) : null, updatedAt: new Date().toISOString()});
   if (body.state !== '作成中') lpQueuePut_(lpQueueGet_().filter(x => x.task !== body.task));
   return {ok: true};
+  } finally { lock.releaseLock(); }
 }
 
 

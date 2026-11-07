@@ -21,16 +21,21 @@
   el('report-link').href = `report.html?id=${encodeURIComponent(room.id)}`;
   const lp = {box: el('lp-box'), btn: el('lp-button'), msg: el('lp-state')};
   const lpShow = st => {
+    const badge = el('lp-badge');
+    const excluded = /申込|契約済|入居済|募集止/.test(`${room.s || ''} ${room.c || ''}`);
+    badge.textContent = excluded ? '申込済み・案内対象外' : st.state === '完了' ? '登録済み' : st.state === 'none' ? '未登録' : st.state;
+    badge.dataset.state = excluded ? 'excluded' : st.state;
     lp.msg.innerHTML = ''; lp.btn.hidden = false; lp.btn.disabled = false;
-    if (st.state === '完了' && st.url) {
+    if (excluded) { lp.btn.hidden = true; lp.msg.textContent = '申込済み・募集停止のため、LPの案内と作成は行いません。'; }
+    else if (st.state === '完了' && /^https:\/\//.test(st.url || '')) {
       lp.btn.hidden = true;
-      lp.msg.innerHTML = `<a href="${esc(st.url)}" target="_blank" rel="noopener noreferrer">物件紹介LPを開く ↗</a> <button type="button" class="link-button" id="lp-copy">URLをコピー</button>`;
+      lp.msg.innerHTML = `<label class="lp-url-label" for="lp-url">お客様への案内URL</label><input id="lp-url" class="lp-url-input" type="url" readonly value="${esc(st.url)}"><div class="lp-actions"><a class="route-button" href="${esc(st.url)}" target="_blank" rel="noopener noreferrer">LPを開く ↗</a><button type="button" class="secondary-button" id="lp-copy">URLをコピー</button></div>`;
       el('lp-copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(st.url); el('lp-copy').textContent = 'コピーしました'; } catch { prompt('URLをコピーしてください', st.url); } });
     } else if (st.state === '依頼中' || st.state === '作成中') {
       lp.btn.hidden = true; lp.msg.textContent = st.state === '作成中' ? 'LPを作成しています…（数分かかります）' : '作成待ちです（最大5分ほどで作成を始めます）';
     } else if (st.state === '失敗') {
       lp.btn.textContent = 'もう一度LPを作成'; lp.msg.textContent = `作成できませんでした：${st.message || '原因不明'}`;
-    } else { lp.btn.textContent = '物件紹介LPを作成'; }
+    } else { lp.btn.textContent = '物件紹介LPを作成'; lp.msg.textContent = 'この部屋に登録されたLPはありません。'; }
   };
   const lpPoll = async () => {
     try { const st = await api.lpStatus(room.id); lpShow(st); if (st.state === '依頼中' || st.state === '作成中') setTimeout(lpPoll, 20000); }
