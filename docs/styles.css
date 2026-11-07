@@ -86,8 +86,10 @@ body.auth-wait main,body.auth-wait .outbox-bar{visibility:hidden}
 #summary-table th.col-sum{background:#1b5d85;color:#fff}
 #summary-table th.col-sum small{color:#d6e7f2}
 #summary-table td.col-sum{background:#e3eff7}
-#summary-table td.col-sum .cnt{background:#1b5d85;color:#fff;font-size:1rem;padding:3px 12px}
-#summary-table td.col-sum .cnt:hover,#summary-table td.col-sum .cnt:focus-visible{background:#0f3f5e}
+#summary-table td.col-sum .cnt{font-size:1rem;padding:3px 12px}
+/* 白抜き（青地に白文字）は各エリアの合計行だけ（2026-11-07） */
+#summary-table tr.area-total-row td.col-sum .cnt{background:#1b5d85;color:#fff}
+#summary-table tr.area-total-row td.col-sum .cnt:hover,#summary-table tr.area-total-row td.col-sum .cnt:focus-visible{background:#0f3f5e}
 #summary-table th:nth-last-child(-n+2){background:#163d5a;color:#fff}
 #summary-table td:nth-last-child(-n+2){color:#0f3f5e;font-size:1rem;font-weight:800;background:#f4f8fb}
 #summary-table tr.total-row td{background:#fff3c4;border-top:2px solid #e8c25a;font-size:1rem}
