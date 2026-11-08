@@ -1,0 +1,28 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('docs/checksheet-preview/preview.js','utf8');
+assert.doesNotMatch(source,/\bfetch\s*\(|localStorage|sessionStorage|XMLHttpRequest/);
+const html=fs.readFileSync('docs/checksheet-preview/index.html','utf8');
+assert.doesNotMatch(html,/<input|<textarea|api\.js|snapshot-current/);
+const nodes=Object.fromEntries(['view','app','notice','login-status'].map(id=>[id,{hidden:true,innerHTML:'',textContent:'',listeners:{},addEventListener(event,fn){this.listeners[event]=fn;}}]));
+const listeners={};const location={hash:'#dashboard'};
+const window={Auth:{ready:Promise.resolve()},addEventListener:(event,fn)=>listeners[event]=fn,print(){}};
+const document={getElementById:id=>nodes[id],querySelectorAll:()=>[]};
+vm.runInNewContext(source,{window,document,location,console});
+const tick=()=>new Promise(r=>setImmediate(r));
+const action=value=>nodes.app.listeners.click({target:{closest:selector=>selector==='[data-action]'?{dataset:{action:value}}:null}});
+(async()=>{
+  await tick();assert.equal(nodes.app.hidden,false);assert.match(nodes.view.innerHTML,/ダッシュボード/);
+  location.hash='#resident';listeners.hashchange();assert.match(nodes.view.innerHTML,/不具合なしで確認/);
+  nodes.app.listeners.click({target:{closest:selector=>selector==='[data-pin]'?{dataset:{pin:'2'}}:null}});
+  assert.match(nodes.view.innerHTML,/キッチンの水漏れ/);
+  action('confirm');assert.match(nodes.view.innerHTML,/内容の確認/);
+  action('submit');assert.match(nodes.view.innerHTML,/サーバーへの保存・通知は行っていません/);
+  location.hash='#submissions';listeners.hashchange();assert.match(nodes.view.innerHTML,/確認操作時|第1版/);
+  location.hash='#issues';listeners.hashchange();assert.match(nodes.view.innerHTML,/キッチンの水漏れ/);
+  nodes.app.listeners.change({target:{matches:()=>true,dataset:{field:'status',tenancy:'2',issue:'2'},value:'対応完了'}});
+  assert.match(nodes.view.innerHTML,/未対応 → 対応完了/);
+  nodes.app.listeners.click({target:{closest:selector=>selector==='#reset'?{}:null}});
+  location.hash='#submissions';listeners.hashchange();assert.match(nodes.view.innerHTML,/未提出/);
+  assert.equal(nodes.notice.textContent,'');
+  console.log('Checksheet preview passed: login gate, sample submission, pin controls, status history, reset and no business API/storage.');
+})();

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+  <title>入居者チェックシート｜確認用デモ</title>
+  <link rel="stylesheet" href="preview.css?v=1">
+  <script defer src="../vendor/msal-browser-2.38.3.min.js"></script>
+  <script defer src="../config.js?v=20261008gas2"></script>
+  <script defer src="../auth.js?v=20261011e"></script>
+  <script defer src="preview.js?v=1"></script>
+</head>
+<body>
+  <header><div class="masthead-inner"><a class="brand" href="#dashboard"><small>HOUSING LOBBY</small>入居者チェックシート</a></div></header>
+  <p id="login-status" role="status">Microsoftログインを確認しています…</p>
+  <main id="app" hidden>
+    <div class="demo-banner"><strong>確認用デモ · 架空データのみ</strong><span>変更はこの画面内だけ。再読み込みで元に戻ります。</span></div>
+    <p class="safety">実際の氏名・連絡先・室内写真は入力しないでください。SharePoint・Asanaへの保存／送信、入居者URLの発行は行いません。社員限定の最終権限設定は未完了です。</p>
+    <nav aria-label="画面切替"><a href="#dashboard">ダッシュボード</a><a href="#submissions">提出状況</a><a href="#issues">不具合対応</a><a href="#resident">入居者画面を試す</a></nav>
+    <div id="view"></div>
+    <p id="notice" class="notice" role="status" aria-live="polite"></p>
+    <footer>操作確認用 · 保存先接続・自動PDF・通知・本番の権限管理は、このデモに含まれません。<button id="reset" class="quiet">デモを初期状態に戻す</button></footer>
+  </main>
+  <noscript>この確認画面にはJavaScriptが必要です。</noscript>
+</body></html>
