@@ -124,8 +124,8 @@
     el(tableId).innerHTML = `<thead><tr><th>${label}</th>${areaCols.map(a => `<th class="num">${a}</th>`).join('')}<th class="num">合計</th></tr></thead><tbody>${values.filter(v => v !== skip).map(v => `<tr><td><strong>${esc(v)}</strong></td>${areaCols.map(a => `<td class="num">${pick(cell(v, a), {[filterKey]: v, a: a === 'その他' ? 'other' : a})}</td>`).join('')}<td class="num"><strong>${pick(cell(v), {[filterKey]: v})}</strong></td></tr>`).join('')}<tr class="total-row"><td>合計</td>${areaCols.map(a => `<td class="num">${src.filter(r => areaOf(r) === a).length}</td>`).join('')}<td class="num">${src.length}</td></tr></tbody>`;
     return values;
   };
-  const condOf = row => row.c || '退去前', kindOf = row => row.m || '種別なし';
-  const condValues = crossTable('status-table', '空室状況', condOf, 'c', '退去前');
+  const condOf = row => row.c || 'その他', kindOf = row => row.m || '種別なし';
+  const condValues = crossTable('status-table', '空室状況', condOf, 'c', 'その他');
   const kindValues = crossTable('kind-table', '管理種別', kindOf, 'm');
   el('cond-filter').insertAdjacentHTML('beforeend', condValues.map(v => `<option>${esc(v)}</option>`).join(''));
   el('kind-filter').insertAdjacentHTML('beforeend', '<option value="__general">一般（一般管理・セキスイ）</option>' + kindValues.map(v => `<option>${esc(v)}</option>`).join(''));
