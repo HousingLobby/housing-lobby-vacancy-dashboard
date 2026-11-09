@@ -2007,7 +2007,7 @@ function hankyoSurname_(v) { const n = hankyoNameKey_(v); return n.indexOf(' ') 
 // 物件名の末尾の号室を分ける（分けられなければ号室は空。登録前に画面で直せる）
 function hankyoSplitRoom_(v) {
   const s = String(v || '').normalize('NFKC').trim();
-  const m = s.match(/^(.*?)[\s・-]*([0-9]{1,4}[A-Za-z]?|[A-Za-z][0-9]{1,3})(号室|号)?$/);
+  const m = s.match(/^(.*?)[\s・-]*([0-9]{1,4}[A-Za-z]?|(?<![A-Za-z])[A-Za-z][0-9]{1,3})(号室|号)?$/); // ABE103 を AB＋E103 にしない（英字が英単語の途中なら号室に含めない。2026-11-09）
   return m && m[1] ? {property: m[1].trim(), room: m[2]} : {property: s, room: ''};
 }
 
@@ -2080,7 +2080,7 @@ function hankyoAsanaCheck_() {
     const t = hankyoAsanaFind_(r, tasks);
     const sp = hankyoSplitRoom_(r['物件名']);
     items[r.id] = t ? {registered: true, gid: t.gid, name: t.name}
-      : {registered: false, suggest: {name: hankyoSurname_(r['顧客名']) + '様', property: sp.property, room: r['号室'] || sp.room, due: r['受付日'], store: r['店舗']}};
+      : {registered: false, suggest: {name: hankyoSurname_(r['顧客名']) + '様', property: r['号室'] ? String(r['物件名']).normalize('NFKC').trim() : sp.property, room: r['号室'] || sp.room, due: r['受付日'], store: r['店舗']}};
   });
   return {ok: true, items: items, checkedAt: new Date().toISOString()};
 }

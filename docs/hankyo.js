@@ -157,7 +157,7 @@
   const SIGN = ['◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆', '〒850-0004', '長崎県長崎市下西山町1-5', '株式会社ハウジングロビー', 'TEL | 095-893-5056', 'FAX | 095-893-5057', 'https://www.h-lobby.jp/', '◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆'].join('\n');
   const LINE = 'https://line.me/R/ti/p/@291ytred';
   // 物件名の末尾の号室を分ける（表記はJDSの全角のまま）：402／Ｂ１０２／１０２Ａ／402号室 など
-  const splitRoom = prop => { const m = String(prop || '').trim().match(/^(.*?)[\s・\-－‐]*([0-9０-９]{2,4}[A-Za-zＡ-Ｚａ-ｚ]?|[A-Za-zＡ-Ｚａ-ｚ][\-－‐]?[0-9０-９]{1,3})(?:号室|号)?$/); return m && m[1] ? {prop: m[1], room: m[2]} : {prop: String(prop || ''), room: ''}; };
+  const splitRoom = prop => { const m = String(prop || '').trim().match(/^(.*?)[\s・\-－‐]*([0-9０-９]{2,4}[A-Za-zＡ-Ｚａ-ｚ]?|(?<![A-Za-zＡ-Ｚａ-ｚ])[A-Za-zＡ-Ｚａ-ｚ][\-－‐]?[0-9０-９]{1,3})(?:号室|号)?$/); return m && m[1] ? {prop: m[1], room: m[2]} : {prop: String(prop || ''), room: ''}; };
   const mdOf = iso => { const [y, mo, d] = iso.split('-').map(Number); const dt = new Date(Date.UTC(y, mo - 1, d + 2)); return `${dt.getUTCMonth() + 1}/${dt.getUTCDate()}`; };
   function makeReply(k) {
     const name = (current.name || 'お客様').replace(/様\s*$/, '') + '様';
