@@ -225,28 +225,4 @@
   el('patrol-area').addEventListener('change',renderPatrol);
   el('patrol-status').addEventListener('change',renderPatrol);
   renderPatrol();
-
-  // 管理戸数の登録（月ごと・社内ログイン必須）
-  const form = el('management-form');
-  if (!window.Api.configured) { el('management-panel').hidden = true; el('bd-mgmt-tab').hidden = true; return; }
-  const prev = new Date(Date.UTC(Number(currentMonth.slice(0,4)), Number(currentMonth.slice(5)) - 2, 1)).toISOString().slice(0,7);
-  form.elements.month.value = prev;
-  el('management-base').textContent = `登録済み：${months.length ? months.map(monthLabel).join('、') : 'なし'}。全体会議資料「○月度（○月実績）」の実績月で登録します。登録した戸数は画面に表示されません（非公開）。`;
-  el('management-inputs').innerHTML = areas.map(area => `<div class="mgmt-row"><span>${area}</span><label>サブ<input type="number" min="0" step="1" required name="${area}|sub"></label><label>一般<input type="number" min="0" step="1" required name="${area}|general"></label></div>`).join('');
-  form.elements.source.value = '';
-  // 以前この端末に保存した管理用合言葉は以後使わない。
-  window.Api.prefs.set({adminPasscode: null});
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    const msg = el('management-message');
-    const body = {month: form.elements.month.value, source: form.elements.source.value.trim(), areas: {}};
-    for (const area of areas) body.areas[area] = {sub: Number(form.elements[`${area}|sub`].value), general: Number(form.elements[`${area}|general`].value)};
-    if (!confirm(`${monthLabel(body.month)}の管理戸数を登録します。よろしいですか？`)) return;
-    msg.textContent = '登録しています…';
-    try {
-      await window.Api.setManagement(body);
-      msg.textContent = '登録しました。画面を更新します。';
-      setTimeout(() => location.reload(), 800);
-    } catch (err) { msg.textContent = `登録できませんでした：${err.message}`; }
-  });
 })();
