@@ -157,7 +157,7 @@
   const SIGN = ['◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆', '〒850-0004', '長崎県長崎市下西山町1-5', '株式会社ハウジングロビー', 'TEL | 095-893-5056', 'FAX | 095-893-5057', 'https://www.h-lobby.jp/', '◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆＊◆'].join('\n');
   const LINE = 'https://line.me/R/ti/p/@291ytred';
   // 物件名の末尾の号室を分ける（表記はJDSの全角のまま）：402／Ｂ１０２／１０２Ａ／402号室 など
-  const splitRoom = prop => { const m = String(prop || '').trim().match(/^(.*?)[\s・\-－‐]*([0-9０-９]{2,4}[A-Za-zＡ-Ｚａ-ｚ]?|(?<![A-Za-zＡ-Ｚａ-ｚ])[A-Za-zＡ-Ｚａ-ｚ][\-－‐]?[0-9０-９]{1,3})(?:号室|号)?$/); return m && m[1] ? {prop: m[1], room: m[2]} : {prop: String(prop || ''), room: ''}; };
+  const splitRoom = prop => splitPropertyRoom(prop, vacCache ? vacCache.map(v => v.p).filter(Boolean) : null); // room-split.js（GASと同じルール）
   const mdOf = iso => { const [y, mo, d] = iso.split('-').map(Number); const dt = new Date(Date.UTC(y, mo - 1, d + 2)); return `${dt.getUTCMonth() + 1}/${dt.getUTCDate()}`; };
   function makeReply(k) {
     const name = (current.name || 'お客様').replace(/様\s*$/, '') + '様';
@@ -172,7 +172,10 @@
   }
   function fillTplForm(d) {
     const sp = d.room ? {prop: d.property, room: d.room} : splitRoom(d.property);
-    $('tpl-prop').value = sp.prop; $('tpl-room').value = sp.room; $('tpl-lp').value = d.lp || ''; $('tpl-other').value = ''; $('tpl-date').value = '';
+    $('tpl-prop').value = sp.prop; $('tpl-room').value = sp.room;
+    // 空室一覧がまだ読めていなければ、読めたあとに物件名の辞書で分け直す（手で直していない場合だけ）
+    if (!d.room && !vacCache) Api.snapshot().then(j => { vacCache = j.vacancies || []; const s2 = splitRoom(d.property);
+      if (current && current.id === d.id && $('tpl-prop').value === sp.prop && $('tpl-room').value === sp.room) { $('tpl-prop').value = s2.prop; $('tpl-room').value = s2.room; } }).catch(() => {}); $('tpl-lp').value = d.lp || ''; $('tpl-other').value = ''; $('tpl-date').value = '';
     $('tpl-kind').value = /申込|募集終了|紹介不可/.test(d.status || '') ? 'no' : /解約予定/.test(d.status || '') ? 'soon' : 'vacant';
     syncTplKind();
   }

@@ -2004,12 +2004,29 @@ const HANKYO_ASANA = {
 // 氏名の正規化と苗字（JDSの「名前（漢字）」は「山田 太郎」のように空白区切りが多い）
 function hankyoNameKey_(v) { return String(v || '').normalize('NFKC').replace(/様\s*$/, '').replace(/[（(].*?[）)]/g, '').replace(/\s+/g, ' ').trim(); }
 function hankyoSurname_(v) { const n = hankyoNameKey_(v); return n.indexOf(' ') > 0 ? n.split(' ')[0] : n; }
-// 物件名の末尾の号室を分ける（分けられなければ号室は空。登録前に画面で直せる）
-function hankyoSplitRoom_(v) {
-  const s = String(v || '').normalize('NFKC').trim();
-  const m = s.match(/^(.*?)[\s・-]*([0-9]{1,4}[A-Za-z]?|(?<![A-Za-z])[A-Za-z][0-9]{1,3})(号室|号)?$/); // ABE103 を AB＋E103 にしない（英字が英単語の途中なら号室に含めない。2026-11-09）
-  return m && m[1] ? {property: m[1].trim(), room: m[2]} : {property: s, room: ''};
+// 物件名と号室の切り分け（画面の docs/room-split.js と同じ中身。tests/room-split.cjs で照合）
+function splitPropertyRoom_(text, names) {
+  const s = String(text || '').trim();
+  const nz = v => String(v || '').normalize('NFKC').replace(/[\s・･]/g, '').toLowerCase();
+  const tail = v => v.replace(/^[\s・･\-－‐]+/, '').replace(/(?:号室|号)$/, '').trim();
+  if (names && names.length) {
+    const set = {}; names.forEach(n => { const k = nz(n); if (k) set[k] = true; });
+    for (let i = s.length; i > 0; i--) {
+      if (!set[nz(s.slice(0, i))]) continue;
+      const room = tail(s.slice(i));
+      if (/^[0-9０-９A-Za-zＡ-Ｚａ-ｚ\-－‐]{0,6}$/.test(room)) return {prop: s.slice(0, i).trim(), room: room};
+    }
+  }
+  // 英字が英単語の途中（ABE103 の E）なら号室に含めない。ローマ数字（Ⅰ・Ⅱ）は物件名の一部
+  const m = s.match(/^(.*?)[\s・･\-－‐]*([0-9０-９]{2,4}[A-Za-zＡ-Ｚａ-ｚ]?|[0-9０-９][A-Za-zＡ-Ｚａ-ｚ]|(?<![A-Za-zＡ-Ｚａ-ｚ])[A-Za-zＡ-Ｚａ-ｚ][\-－‐]?[0-9０-９]{1,3})(?:号室|号)?$/);
+  return m && m[1] ? {prop: m[1].trim(), room: m[2]} : {prop: s, room: ''};
 }
+// 物件名の末尾の号室を分ける（分けられなければ号室は空。登録前に画面で直せる）。names＝空室一覧の物件名（あれば優先）
+function hankyoSplitRoom_(v, names) {
+  const r = splitPropertyRoom_(v, names), n = x => String(x || '').normalize('NFKC').trim();
+  return {property: n(r.prop), room: n(r.room)};
+}
+function hankyoVacancyNames_(vacancies) { return (vacancies || []).map(x => x.p).filter(Boolean); }
 
 // セルフ内見予約表の、反響の期間まわりのタスク（未完了＋期間中に完了したもの）。
 // 説明欄はTEL・メールだけ取り出して持つ（同じ苗字の別人を見分けるため。2026-11-01）
@@ -2076,9 +2093,11 @@ function hankyoAsanaCheck_() {
   const from = rows.map(r => String(r['受付日'])).sort()[0];
   const tasks = hankyoAsanaTasks_(from, true);
   const items = {};
+  let names = [];
+  try { names = hankyoVacancyNames_(getSnapshot_(false).vacancies); } catch (e) { console.warn('空室一覧を読めません：' + e.message); }
   rows.forEach(r => {
     const t = hankyoAsanaFind_(r, tasks);
-    const sp = hankyoSplitRoom_(r['物件名']);
+    const sp = hankyoSplitRoom_(r['物件名'], names);
     items[r.id] = t ? {registered: true, gid: t.gid, name: t.name}
       : {registered: false, suggest: {name: hankyoSurname_(r['顧客名']) + '様', property: r['号室'] ? String(r['物件名']).normalize('NFKC').trim() : sp.property, room: r['号室'] || sp.room, due: r['受付日'], store: r['店舗']}};
   });
@@ -2134,7 +2153,7 @@ function hankyoAsanaPlace_(r, vacancies) {
   const v = (vacancies || []).find(x => n(String(x.p || '') + String(x.r || '')) === key);
   if (v) return {property: String(v.p).normalize('NFKC').trim(), room: String(v.r || '').normalize('NFKC').trim()};
   if (r['号室']) return {property: String(r['物件名']).normalize('NFKC').trim(), room: String(r['号室']).normalize('NFKC').trim()};
-  return hankyoSplitRoom_(r['物件名']);
+  return hankyoSplitRoom_(r['物件名'], hankyoVacancyNames_(vacancies));
 }
 
 // JDSの反響を取り込んだ時点で、Asanaに無いものを自動で登録する（2026-11-01 オーナー指示）。
